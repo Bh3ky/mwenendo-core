@@ -5,8 +5,8 @@
     - [x]  Understand Django apps and separation of concerns.
     - [x]  Move settings to environment variables (`.env` and `.env.example`).
     - [x]  Run PostgreSQL via Docker Compose and switch Django to it.
-    - [ ]  Add pytest-django and a first test (the health check).
-    - [ ]  Add ruff and a GitHub Actions workflow (lint and tests against Postgres).
+    - [x]  Add pytest-django and a first test (the health check).
+    - [x]  Add ruff and a GitHub Actions workflow (lint and tests against Postgres).
     - [x]  Write ADR-0001: why PostgreSQL.
     - [ ]  Split into apps: `core` (shared and health), `inventory` and `reservations`.
 
