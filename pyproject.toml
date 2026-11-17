@@ -1,7 +1,7 @@
 [project]
 name = "mwenendo-core"
 version = "0.1.0"
-description = "Add your description here"
+description = "A high-concurrency, event-driven inventory allocation engine built with Django and PostgreSQL."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

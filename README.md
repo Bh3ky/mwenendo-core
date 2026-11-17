@@ -100,16 +100,16 @@ PostgreSQL will remain the authoritative source of inventory state.
 - [x] Initial application and URL configuration
 - [x] Basic landing page
 - [x] Health-check endpoint
-- [ ] PostgreSQL integration and database modelling
-- [ ] Inventory management
+- [ ] Environment configuration, PostgreSQL, testing and CI
+- [ ] Database modelling and inventory management
 - [ ] Reservation API
 - [ ] Transaction management and row-level locking
-- [ ] Reservation state machine
-- [ ] Idempotency and duplicate request handling
+- [ ] Reservation state machine and idempotency
 - [ ] Celery and Redis integration
-- [ ] Automated concurrency testing
 - [ ] Locust load testing and performance benchmarking
 - [ ] Dockerisation and production deployment
+
+See the [full roadmap](docs/ROADMAP.md) for the detailed milestones.
 
 ## Getting Started
 
