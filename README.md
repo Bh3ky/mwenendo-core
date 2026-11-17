@@ -60,7 +60,7 @@ The system is being designed around the following principles:
 | Test data | Factory Boy | Reproducible test data generation |
 | Load testing | Locust | Concurrent request simulation |
 
-> *Note: The initial development foundation currently uses Django and SQLite. The remaining components will be introduced incrementally.*
+> *Note: Django, PostgreSQL, pytest and CI are in place. Django Ninja, Celery, Redis, Factory Boy and Locust will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
 
 ## Core Design
 
@@ -117,6 +117,7 @@ See the [full roadmap](docs/ROADMAP.md) for the detailed milestones.
 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose
 
 ### Installation
 
@@ -125,6 +126,27 @@ Clone the repository:
 ```bash
 git clone https://github.com/Bh3ky/mwenendo-core.git
 cd mwenendo-core
+```
+
+Create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+Replace the `change-me` placeholders in `.env`. Generate a value for `SECRET_KEY` and for `POSTGRES_PASSWORD` with:
+
+```bash
+uv run python -c "import secrets; print(secrets.token_urlsafe(50))"
+```
+
+Set the `POSTGRES_*` values before the first `docker compose up`. The database reads them only once, when it first creates its data volume, so changing them later does not change the existing password.
+
+Start PostgreSQL and wait until its status is `healthy`:
+
+```bash
+docker compose up -d
+docker compose ps
 ```
 
 Install dependencies:
@@ -152,9 +174,17 @@ The application will be available at:
 
 ## Testing
 
-Automated application and concurrency tests will be introduced as the core functionality develops.
+Run the tests and linters (PostgreSQL must be running):
 
-The testing strategy will eventually cover:
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+```
+
+Tests run against a temporary `test_` database that is created and dropped automatically. They never touch the development database. The same checks run in CI on every pull request.
+
+Concurrency and load tests will be introduced as the core functionality develops. The testing strategy will eventually cover:
 
 - Inventory allocation correctness.
 - Transaction rollback behaviour.
