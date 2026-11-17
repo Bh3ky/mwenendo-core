@@ -64,5 +64,5 @@ dist/
 .pyright/
 
 
-# docs
-docs/
+# docs (personal learning notes stay private; everything else in docs/ is published)
+docs/NOTES.md
