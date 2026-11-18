@@ -8,7 +8,7 @@
     - [x]  Add pytest-django and a first test (the health check).
     - [x]  Add ruff and a GitHub Actions workflow (lint and tests against Postgres).
     - [x]  Write ADR-0001: why PostgreSQL.
-    - [ ]  Split into apps: `core` (shared and health), `inventory` and `reservations`.
+    - [x]  Split into apps: `core` (shared and health), `inventory` and `reservations`.
 
     > *Outcome:* A reproducible development environment, with CI running on every push.
     >
