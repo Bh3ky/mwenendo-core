@@ -13,13 +13,13 @@
     > *Outcome:* A reproducible development environment, with CI running on every push.
     >
 - Milestone 2 - Database modelling and integrity
-    - [ ]  Design Product and Inventory models.
-    - [ ]  Introduce database constraints.
-    - [ ]  Understand migrations and indexes.
+    - [x]  Design Product and Inventory models.
+    - [x]  Introduce database constraints.
+    - [x]  Understand migrations and indexes.
     - [ ]  Implement basic stock management.
     - [ ]  Test each constraint using Factory Boy.
-    - [ ]  Write ADR: stock model (mutable counter vs append-only ledger).
-    - [ ]  Write ADR: enforcing `allocated <= total` with a database `CheckConstraint` vs code only.
+    - [x]  Write ADR: stock model (mutable counter vs append-only ledger).
+    - [x]  Write ADR: enforcing `allocated <= total` with a database `CheckConstraint` vs code only.
 
     > *Outcome:* A database that rejects invalid inventory states.
     >
@@ -50,6 +50,7 @@
     - [ ]  Prevent invalid transitions.
     - [ ]  Introduce idempotency keys.
     - [ ]  Handle duplicate requests and repeated operations.
+    - [ ]  Design and add an append-only stock movement ledger alongside the counters (with an ADR, revisiting ADR-0003).
 
     > *Outcome:* Predictable reservation lifecycle management.
     >
