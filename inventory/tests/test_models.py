@@ -8,10 +8,12 @@ from inventory.models import Inventory, Product
 def test_sku_must_be_unique():
     Product.objects.create(sku="SKU-1", name="First")
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(IntegrityError) as excinfo:
         # atomic() creates a savepoint, a rollback point inside the transaction
         with transaction.atomic():
             Product.objects.create(sku="SKU-1", name="Second")
+
+    assert "inventory_product_sku_key" in str(excinfo.value)
 
 
 @pytest.mark.django_db
@@ -76,6 +78,53 @@ def test_over_allocation_through_update_rejected():
             Inventory.objects.filter(pk=inventory.pk).update(allocated_quantity=999)
 
     assert "inventory_allocated_lte_total" in str(excinfo.value)
+
+    inventory.refresh_from_db()
+    assert inventory.allocated_quantity == 3
+
+
+@pytest.mark.django_db
+def test_negative_allocated_quantity_rejected_on_insert():
+    product = Product.objects.create(sku="SKU-1", name="Widget")
+
+    with pytest.raises(IntegrityError) as excinfo:
+        with transaction.atomic():
+            Inventory.objects.create(
+                product=product, total_quantity=5, allocated_quantity=-1
+            )
+
+    assert "inventory_inventory_allocated_quantity_check" in str(excinfo.value)
+
+
+@pytest.mark.django_db
+def test_negative_total_quantity_rejected_on_insert():
+    product = Product.objects.create(sku="SKU-1", name="Widget")
+
+    with pytest.raises(IntegrityError) as excinfo:
+        with transaction.atomic():
+            Inventory.objects.create(
+                product=product, total_quantity=-1, allocated_quantity=0
+            )
+
+    # a negative total breaks two rules at once (total >= 0
+    # and allocated <= total), and Postgres reports only one
+    # of them, so we assert the kind of failure, not a
+    # specific constraint name.
+    assert "violates check constraint" in str(excinfo.value)
+
+
+@pytest.mark.django_db
+def test_negative_allocated_quantity_rejected_on_update():
+    product = Product.objects.create(sku="SKU-1", name="Widget")
+    inventory = Inventory.objects.create(
+        product=product, total_quantity=5, allocated_quantity=3
+    )
+
+    with pytest.raises(IntegrityError) as excinfo:
+        with transaction.atomic():
+            Inventory.objects.filter(pk=inventory.pk).update(allocated_quantity=-1)
+
+    assert "inventory_inventory_allocated_quantity_check" in str(excinfo.value)
 
     inventory.refresh_from_db()
     assert inventory.allocated_quantity == 3
