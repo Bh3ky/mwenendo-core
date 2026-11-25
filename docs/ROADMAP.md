@@ -17,7 +17,7 @@
     - [x]  Introduce database constraints.
     - [x]  Understand migrations and indexes.
     - [x]  Implement basic stock management.
-    - [ ]  Test each constraint using Factory Boy.
+    - [x]  Test each constraint using Factory Boy.
     - [x]  Write ADR: stock model (mutable counter vs append-only ledger).
     - [x]  Write ADR: enforcing `allocated <= total` with a database `CheckConstraint` vs code only.
 
