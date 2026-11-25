@@ -68,7 +68,7 @@ def test_add_stock_raises_does_not_exist_for_deleted_inventory():
 
     Inventory.objects.filter(pk=inventory.pk).delete()
 
-    with pytest.raises(Inventory.DoesNotExist):
+    with pytest.raises(Inventory.DoesNotExist, match=r"Inventory \d+ does not exist"):
         add_stock(inventory, 5)
 
 
@@ -146,7 +146,7 @@ def test_remove_stock_raises_does_not_exist_for_deleted_inventory():
 
     Inventory.objects.filter(pk=inventory.pk).delete()
 
-    with pytest.raises(Inventory.DoesNotExist):
+    with pytest.raises(Inventory.DoesNotExist, match=r"Inventory \d+ does not exist"):
         remove_stock(inventory, 5)
 
 

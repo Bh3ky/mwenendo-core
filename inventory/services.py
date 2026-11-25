@@ -47,6 +47,10 @@ def remove_stock(inventory: Inventory, quantity: int) -> None:
 
     # handle unsuccessful update
     if updated == 0:
+        # a deleted row is a different failure from insufficient stock
+        if not Inventory.objects.filter(pk=inventory.pk).exists():
+            raise Inventory.DoesNotExist(f"Inventory {inventory.pk} does not exist")
+
         inventory.refresh_from_db()
 
         available = inventory.total_quantity - inventory.allocated_quantity
