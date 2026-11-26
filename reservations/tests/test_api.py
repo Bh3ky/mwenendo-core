@@ -2,7 +2,8 @@ import uuid
 
 import pytest
 
-from inventory.api import MAX_QUANTITY
+from core.limits import MAX_QUANTITY
+from inventory.models import Inventory
 from inventory.tests.factories import InventoryFactory
 from reservations.models import Reservation
 from reservations.tests.factories import ReservationFactory
@@ -116,3 +117,22 @@ def test_get_reservation_with_a_malformed_id_returns_422(client):
     response = client.get("/api/reservations/not-a-uuid")
 
     assert response.status_code == 422
+
+
+@pytest.mark.django_db
+def test_create_reservation_returns_404_if_the_row_vanishes_mid_request(
+    client, monkeypatch
+):
+    InventoryFactory(product__sku="DEMO-1")
+
+    def row_deleted(inventory, quantity, reference):
+        raise Inventory.DoesNotExist
+
+    # Simulate the row being deleted between the lookup and the update,
+    # a race the test client cannot trigger on its own.
+    monkeypatch.setattr("reservations.api.reserve_stock", row_deleted)
+
+    response = _post(client, "DEMO-1", {"quantity": 1, "reference": "order-1"})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
