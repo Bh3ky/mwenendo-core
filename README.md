@@ -60,13 +60,13 @@ The system is being designed around the following principles:
 | Test data | Factory Boy | Reproducible test data generation |
 | Load testing | Locust | Concurrent request simulation |
 
-> *Note: Django, PostgreSQL, pytest and CI are in place. Django Ninja, Celery, Redis, Factory Boy and Locust will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
+> *Note: Django, Django Ninja, PostgreSQL, pytest, Factory Boy and CI are in place. Celery, Redis and Locust will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
 
 ## Core Design
 
 ### Inventory Allocation
 
-PostgreSQL row-level locking using `SELECT FOR UPDATE` will be used to coordinate competing transactions attempting to allocate the same inventory.
+Competing requests for the same inventory are coordinated by PostgreSQL's row-level locking. Allocation is a single conditional `UPDATE` that checks and writes in one statement, so two requests cannot both claim the last units. `SELECT FOR UPDATE` is the alternative for when a decision needs more than the counter. A threaded test covers both. See [ADR-0008](docs/adr/0008-conditional-update-for-concurrent-allocation.md).
 
 The central invariant is:
 
@@ -103,7 +103,7 @@ PostgreSQL will remain the authoritative source of inventory state.
 - [x] Environment configuration, PostgreSQL, testing and CI
 - [x] Database modelling and inventory management
 - [x] Reservation API
-- [ ] Transaction management and row-level locking
+- [x] Transaction management and row-level locking
 - [ ] Reservation state machine and idempotency
 - [ ] Celery and Redis integration
 - [ ] Locust load testing and performance benchmarking

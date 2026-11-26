@@ -36,12 +36,12 @@
 
     [core engineering milestone]
 
-    - [ ]  Understand ACID transactions.
-    - [ ]  Learn PostgreSQL row-level locking.
-    - [ ]  Implement `transaction.atomic()`.
-    - [ ]  Introduce `select_for_update()`.
-    - [ ]  Simulate competing reservation requests with a threaded concurrency test (`TransactionTestCase`).
-    - [ ]  Write ADR: pessimistic locking (`select_for_update`) vs optimistic locking.
+    - [x]  Understand ACID transactions.
+    - [x]  Learn PostgreSQL row-level locking.
+    - [x]  Implement `transaction.atomic()`.
+    - [x]  Introduce `select_for_update()`.
+    - [x]  Simulate competing reservation requests with a threaded concurrency test (`TransactionTestCase`).
+    - [x]  Write ADR: pessimistic locking (`select_for_update`) vs optimistic locking.
 
     > *Outcome:* A reservation engine that protects inventory under concurrent requests.
     >
