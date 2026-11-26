@@ -1,5 +1,6 @@
 import pytest
 
+from inventory.models import Inventory
 from inventory.tests.factories import InventoryFactory, ProductFactory
 
 
@@ -210,3 +211,58 @@ def test_remove_inventory_unknown_sku_returns_404(client):
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
     assert "application/json" in response["Content-Type"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_stock_endpoints_return_404_if_row_vanishes_mid_request(
+    client, monkeypatch, action
+):
+    InventoryFactory(product__sku="DEMO-1")
+
+    def row_deleted(inventory, quantity):
+        raise Inventory.DoesNotExist
+
+    # Simulate the row being deleted between the lookup and the update,
+    # a race the test client cannot trigger on its own.
+    monkeypatch.setattr(f"inventory.api.{action}_stock", row_deleted)
+
+    response = client.post(
+        f"/api/products/DEMO-1/inventory/{action}",
+        data={"quantity": 5},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_stock_endpoints_reject_malformed_json(client, action):
+    inventory = InventoryFactory(product__sku="DEMO-1", total_quantity=10)
+
+    response = client.post(
+        f"/api/products/DEMO-1/inventory/{action}",
+        data="{not valid json",
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 10
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_stock_endpoints_reject_missing_body(client, action):
+    inventory = InventoryFactory(product__sku="DEMO-1", total_quantity=10)
+
+    response = client.post(
+        f"/api/products/DEMO-1/inventory/{action}",
+        content_type="application/json",
+    )
+
+    assert response.status_code == 422
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 10
