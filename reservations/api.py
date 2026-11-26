@@ -33,6 +33,7 @@ class ReservationOut(Schema):
     status: str
     reference: str
     created_at: datetime
+    expires_at: datetime | None
 
 
 def _to_out(reservation: Reservation, sku: str) -> ReservationOut:
@@ -43,6 +44,7 @@ def _to_out(reservation: Reservation, sku: str) -> ReservationOut:
         status=reservation.status,
         reference=reservation.reference,
         created_at=reservation.created_at,
+        expires_at=reservation.expires_at,
     )
 
 
