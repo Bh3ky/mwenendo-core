@@ -2,10 +2,16 @@ import pytest
 from django.db import DataError
 from django.db.models import Sum
 
-from inventory.services import InsufficientStock
+from inventory.services import InsufficientStock, StockError
 from inventory.tests.factories import InventoryFactory
 from reservations.models import Reservation
-from reservations.services import reserve_stock
+from reservations.services import (
+    InvalidTransition,
+    cancel_reservation,
+    confirm_reservation,
+    reserve_stock,
+)
+from reservations.tests.factories import ReservationFactory
 
 
 @pytest.mark.django_db
@@ -60,3 +66,81 @@ def test_allocated_quantity_equals_the_sum_of_reservations():
         total=Sum("quantity")
     )["total"]
     assert inventory.allocated_quantity == total_reserved == 40
+
+
+Status = Reservation.Status
+
+
+@pytest.mark.django_db
+def test_confirm_moves_pending_to_confirmed_and_keeps_stock_allocated():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=3)
+    reservation = ReservationFactory(inventory=inventory, quantity=3)
+
+    confirm_reservation(reservation)
+
+    inventory.refresh_from_db()
+    assert reservation.status == Status.CONFIRMED
+    assert inventory.allocated_quantity == 3
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("start", [Status.PENDING, Status.CONFIRMED])
+def test_cancel_releases_the_stock(start):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+    reservation = ReservationFactory(inventory=inventory, quantity=3, status=start)
+
+    cancel_reservation(reservation)
+
+    inventory.refresh_from_db()
+    assert reservation.status == Status.CANCELLED
+    assert inventory.allocated_quantity == 2
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("start", "action"),
+    [
+        (Status.CONFIRMED, confirm_reservation),
+        (Status.CANCELLED, confirm_reservation),
+        (Status.CANCELLED, cancel_reservation),
+    ],
+)
+def test_illegal_transitions_are_rejected_and_change_nothing(start, action):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+    reservation = ReservationFactory(inventory=inventory, quantity=3, status=start)
+
+    with pytest.raises(InvalidTransition):
+        action(reservation)
+
+    inventory.refresh_from_db()
+    reservation.refresh_from_db()
+    assert reservation.status == start
+    assert inventory.allocated_quantity == 5
+
+
+@pytest.mark.django_db
+def test_cancel_rolls_back_the_status_if_releasing_stock_fails(monkeypatch):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+    reservation = ReservationFactory(inventory=inventory, quantity=3)
+
+    def release_fails(inventory, quantity):
+        raise StockError("boom")
+
+    monkeypatch.setattr("reservations.services.release_stock", release_fails)
+
+    with pytest.raises(StockError):
+        cancel_reservation(reservation)
+
+    reservation.refresh_from_db()
+    inventory.refresh_from_db()
+    assert reservation.status == Status.PENDING
+    assert inventory.allocated_quantity == 5
+
+
+@pytest.mark.django_db
+def test_transition_of_a_deleted_reservation_raises_does_not_exist():
+    reservation = ReservationFactory()
+    Reservation.objects.filter(pk=reservation.pk).delete()
+
+    with pytest.raises(Reservation.DoesNotExist):
+        confirm_reservation(reservation)
