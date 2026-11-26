@@ -1,9 +1,10 @@
 from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
+from ninja.errors import HttpError
 from pydantic import Field
 
 from inventory.models import Inventory
-from inventory.services import add_stock
+from inventory.services import InsufficientStock, add_stock, remove_stock
 
 router = Router(tags=["inventory"])
 
@@ -43,4 +44,18 @@ def get_inventory(request, sku: str):
 def add_inventory(request, sku: str, payload: StockChangeIn):
     inventory = _get_inventory_or_404(sku)
     add_stock(inventory, payload.quantity)
+    return _to_out(inventory)
+
+
+@router.post("/products/{sku}/inventory/remove", response=InventoryOut)
+def remove_inventory(request, sku: str, payload: StockChangeIn):
+    inventory = _get_inventory_or_404(sku)
+
+    try:
+        remove_stock(inventory, payload.quantity)
+    except InsufficientStock as exc:
+        raise HttpError(409, str(exc)) from exc
+    except Inventory.DoesNotExist as exc:
+        raise HttpError(404, "Not Found") from exc
+
     return _to_out(inventory)
