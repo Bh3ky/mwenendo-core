@@ -52,6 +52,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "core.middleware.RequestLoggingMiddleware",
+    "core.middleware.RequestMetricsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -178,3 +179,7 @@ LOGGING = {
 }
 # Let Celery's lines go through the logging config above, so they are JSON too.
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# /metrics: if a token is set, scrapers must send "Authorization: Bearer <token>".
+# Empty means open, which is fine locally. Also restrict it at the proxy in production.
+METRICS_TOKEN = env("METRICS_TOKEN", default="")

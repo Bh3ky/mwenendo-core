@@ -4,6 +4,7 @@ import uuid
 from django.db import transaction
 from django.db.models import F
 
+from core.metrics import STOCK_ALLOCATION_REFUSED
 from inventory.models import Inventory, StockMovement
 
 logger = logging.getLogger(__name__)
@@ -125,6 +126,7 @@ def allocate_stock(
 
             available = inventory.total_quantity - inventory.allocated_quantity
 
+            STOCK_ALLOCATION_REFUSED.inc()
             logger.warning(
                 "stock.allocation_refused",
                 extra={
