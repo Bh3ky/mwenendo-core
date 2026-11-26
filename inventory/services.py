@@ -1,9 +1,12 @@
+import logging
 import uuid
 
 from django.db import transaction
 from django.db.models import F
 
 from inventory.models import Inventory, StockMovement
+
+logger = logging.getLogger(__name__)
 
 
 class StockError(Exception):
@@ -122,6 +125,14 @@ def allocate_stock(
 
             available = inventory.total_quantity - inventory.allocated_quantity
 
+            logger.warning(
+                "stock.allocation_refused",
+                extra={
+                    "inventory_id": inventory.pk,
+                    "requested": quantity,
+                    "available": available,
+                },
+            )
             raise InsufficientStock(
                 f"Cannot allocate {quantity} units: "
                 f"only {available} are unallocated "
