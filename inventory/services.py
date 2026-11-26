@@ -91,3 +91,26 @@ def allocate_stock(inventory: Inventory, quantity: int) -> None:
         )
 
     inventory.refresh_from_db()
+
+
+def release_stock(inventory: Inventory, quantity: int) -> None:
+    _validate_quantity(quantity)
+
+    # Never release more than is allocated: the counter must not go negative.
+    updated = Inventory.objects.filter(
+        pk=inventory.pk,
+        allocated_quantity__gte=quantity,
+    ).update(allocated_quantity=F("allocated_quantity") - quantity)
+
+    if updated == 0:
+        if not Inventory.objects.filter(pk=inventory.pk).exists():
+            raise Inventory.DoesNotExist(f"Inventory {inventory.pk} does not exist")
+
+        inventory.refresh_from_db()
+
+        raise StockError(
+            f"Cannot release {quantity} units: "
+            f"only {inventory.allocated_quantity} are allocated."
+        )
+
+    inventory.refresh_from_db()
