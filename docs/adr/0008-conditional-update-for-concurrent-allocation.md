@@ -28,7 +28,7 @@ The hot spot is a single counter on a single row (ADR-0003). The decision is whe
 
 Use the **conditional `UPDATE`** (option 1) for allocation, as `allocate_stock` and `remove_stock` already do. The reservation insert shares its transaction (ADR-0007), so a failed insert rolls the counter back.
 
-Evidence: `test_concurrent_reservations_never_oversell` runs 30 threads, released together by a barrier, against a stock of 10. Exactly 10 succeed, 20 are rejected with `InsufficientStock`, the counter is 10, and there are 10 reservation rows. The same harness breaks the naive version, so it can detect the bug.
+Evidence: `test_concurrent_reservations_never_oversell` runs 30 threads, released together by a barrier, against a stock of 10. Exactly 10 succeed, 20 are rejected with `InsufficientStock`, the counter is 10, and there are 10 reservation rows. The same harness breaks the naive version, so it can detect the bug. A second test runs the same harness against a `select_for_update()` variant (lock the row, decide in Python, write) and it also holds, so the choice between the two is about lock duration and flexibility, not correctness.
 
 ## Consequences
 
