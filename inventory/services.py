@@ -63,3 +63,31 @@ def remove_stock(inventory: Inventory, quantity: int) -> None:
         )
 
     inventory.refresh_from_db()
+
+
+def allocate_stock(inventory: Inventory, quantity: int) -> None:
+    _validate_quantity(quantity)
+
+    # One conditional UPDATE: the check and the write happen in the same
+    # statement, so two requests cannot both claim the last units.
+    updated = Inventory.objects.filter(
+        pk=inventory.pk,
+        total_quantity__gte=F("allocated_quantity") + quantity,
+    ).update(allocated_quantity=F("allocated_quantity") + quantity)
+
+    if updated == 0:
+        if not Inventory.objects.filter(pk=inventory.pk).exists():
+            raise Inventory.DoesNotExist(f"Inventory {inventory.pk} does not exist")
+
+        inventory.refresh_from_db()
+
+        available = inventory.total_quantity - inventory.allocated_quantity
+
+        raise InsufficientStock(
+            f"Cannot allocate {quantity} units: "
+            f"only {available} are unallocated "
+            f"(total {inventory.total_quantity}, "
+            f"allocated {inventory.allocated_quantity})."
+        )
+
+    inventory.refresh_from_db()

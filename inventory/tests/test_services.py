@@ -6,6 +6,7 @@ from inventory.services import (
     InvalidQuantity,
     StockError,
     add_stock,
+    allocate_stock,
     remove_stock,
 )
 from inventory.tests.factories import InventoryFactory
@@ -147,3 +148,54 @@ def test_exception_hierarchy():
     assert issubclass(InvalidQuantity, StockError)
     assert issubclass(InvalidQuantity, ValueError)
     assert issubclass(InsufficientStock, StockError)
+
+
+@pytest.mark.django_db
+def test_allocate_stock_increases_allocated_quantity():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=2)
+
+    allocate_stock(inventory, 3)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 5
+    assert inventory.allocated_quantity == 5
+
+
+@pytest.mark.django_db
+def test_allocate_stock_allows_allocating_exactly_the_unallocated_amount():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=3)
+
+    allocate_stock(inventory, 7)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 10
+
+
+@pytest.mark.django_db
+def test_allocate_stock_rejects_more_than_is_unallocated():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=3)
+
+    with pytest.raises(InsufficientStock) as exc_info:
+        allocate_stock(inventory, 8)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 3
+    assert "only 7 are unallocated" in str(exc_info.value)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("bad_quantity", [0, -5, 2.5, True, "3"])
+def test_allocate_stock_rejects_invalid_quantities(bad_quantity):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=0)
+
+    with pytest.raises(InvalidQuantity):
+        allocate_stock(inventory, bad_quantity)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 0
+
+
+@pytest.mark.django_db
+def test_allocate_stock_raises_does_not_exist_for_deleted_inventory():
+    inventory = InventoryFactory()
+
+    Inventory.objects.filter(pk=inventory.pk).delete()
+
+    with pytest.raises(Inventory.DoesNotExist, match=r"Inventory \d+ does not exist"):
+        allocate_stock(inventory, 5)
