@@ -1,6 +1,6 @@
 import pytest
 
-from inventory.api import MAX_QUANTITY
+from core.limits import MAX_QUANTITY
 from inventory.models import Inventory
 from inventory.tests.factories import InventoryFactory, ProductFactory
 

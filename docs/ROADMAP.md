@@ -26,9 +26,9 @@
 - Milestone 3 - Reservation API
     - [x]  Introduce Django Ninja.
     - [x]  Create Pydantic request and response schemas.
-    - [ ]  Implement reservation creation and retrieval.
+    - [x]  Implement reservation creation and retrieval.
     - [x]  Introduce HTTP status codes and API error handling.
-    - [ ]  Test each endpoint and error path as it is built.
+    - [x]  Test each endpoint and error path as it is built.
 
     > *Outcome:* A functioning, tested REST API.
     >
