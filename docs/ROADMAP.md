@@ -50,7 +50,7 @@
     - [x]  Prevent invalid transitions.
     - [x]  Introduce idempotency keys.
     - [x]  Handle duplicate requests and repeated operations.
-    - [ ]  Design and add an append-only stock movement ledger alongside the counters (with an ADR, revisiting ADR-0003).
+    - [x]  Design and add an append-only stock movement ledger alongside the counters (with an ADR, revisiting ADR-0003).
 
     > *Outcome:* Predictable reservation lifecycle management.
     >
