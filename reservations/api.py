@@ -6,7 +6,7 @@ from ninja import Router, Schema, Status
 from ninja.errors import HttpError
 from pydantic import Field
 
-from inventory.api import MAX_QUANTITY
+from core.limits import MAX_QUANTITY
 from inventory.models import Inventory
 from inventory.services import InsufficientStock
 from reservations.models import Reservation

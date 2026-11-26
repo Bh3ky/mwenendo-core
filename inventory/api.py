@@ -3,6 +3,7 @@ from ninja import Router, Schema
 from ninja.errors import HttpError
 from pydantic import Field
 
+from core.limits import MAX_QUANTITY
 from inventory.models import Inventory
 from inventory.services import InsufficientStock, add_stock, remove_stock
 
@@ -14,9 +15,6 @@ class InventoryOut(Schema):
     total_quantity: int
     allocated_quantity: int
     available_quantity: int
-
-
-MAX_QUANTITY = 1_000_000
 
 
 class StockChangeIn(Schema):
