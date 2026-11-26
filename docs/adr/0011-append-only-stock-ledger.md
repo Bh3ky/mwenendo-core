@@ -42,6 +42,7 @@ ADR-0003 deferred a ledger to Milestone 5. This ADR adds one without replacing t
   - The ledger grows without bound. A real system would archive or partition it.
   - Append-only is not enforced by the database yet.
   - Anything that writes counters directly, such as the factories in tests, must also write an opening balance, or it will be reported as a discrepancy. The test factory does this by default.
+  - The opening-balance migration is not idempotent. Reversing it (`migrate inventory 0004`) deliberately leaves the rows in place, so applying it again would insert a second opening row per inventory and double the ledger. It had already been applied when this was noticed, and applied migrations are not edited, so the protection is `reconcile_stock`, which reports the doubling. If the ledger has to be reset, the right fix is a new migration, not a re-run.
   - `find_discrepancies()` aggregates over every inventory, which is fine at this size and would need batching for a very large catalogue.
 - **Revisit when:**
   - The ledger's write cost or size shows up in load tests.
