@@ -43,7 +43,11 @@ def get_inventory(request, sku: str):
 @router.post("/products/{sku}/inventory/add", response=InventoryOut)
 def add_inventory(request, sku: str, payload: StockChangeIn):
     inventory = _get_inventory_or_404(sku)
-    add_stock(inventory, payload.quantity)
+
+    try:
+        add_stock(inventory, payload.quantity)
+    except Inventory.DoesNotExist as exc:
+        raise HttpError(404, "Not Found") from exc
     return _to_out(inventory)
 
 
