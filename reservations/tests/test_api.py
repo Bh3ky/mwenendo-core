@@ -136,3 +136,91 @@ def test_create_reservation_returns_404_if_the_row_vanishes_mid_request(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Not Found"}
+
+
+def _act(client, public_id, action):
+    return client.post(f"/api/reservations/{public_id}/{action}")
+
+
+@pytest.mark.django_db
+def test_confirm_returns_the_confirmed_reservation(client):
+    reservation = ReservationFactory(inventory__product__sku="DEMO-1")
+
+    response = _act(client, reservation.public_id, "confirm")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "confirmed"
+    assert response.json()["sku"] == "DEMO-1"
+    reservation.refresh_from_db()
+    assert reservation.status == "confirmed"
+
+
+@pytest.mark.django_db
+def test_cancel_releases_stock_and_returns_the_cancelled_reservation(client):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+    reservation = ReservationFactory(inventory=inventory, quantity=3)
+
+    response = _act(client, reservation.public_id, "cancel")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+    inventory.refresh_from_db()
+    assert inventory.allocated_quantity == 2
+
+
+@pytest.mark.django_db
+def test_cancelling_twice_conflicts_and_releases_stock_only_once(client):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+    reservation = ReservationFactory(inventory=inventory, quantity=3)
+
+    first = _act(client, reservation.public_id, "cancel")
+    second = _act(client, reservation.public_id, "cancel")
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert "cancelled" in second.json()["detail"]
+    inventory.refresh_from_db()
+    assert inventory.allocated_quantity == 2
+
+
+@pytest.mark.django_db
+def test_confirming_a_cancelled_reservation_conflicts(client):
+    reservation = ReservationFactory(status="cancelled")
+
+    response = _act(client, reservation.public_id, "confirm")
+
+    assert response.status_code == 409
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["confirm", "cancel"])
+def test_actions_on_an_unknown_reservation_return_404(client, action):
+    response = _act(client, uuid.uuid4(), action)
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["confirm", "cancel"])
+def test_actions_with_a_malformed_id_return_422(client, action):
+    response = client.post(f"/api/reservations/not-a-uuid/{action}")
+
+    assert response.status_code == 422
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["confirm", "cancel"])
+def test_actions_return_404_if_the_reservation_vanishes_mid_request(
+    client, monkeypatch, action
+):
+    reservation = ReservationFactory()
+
+    def row_deleted(reservation):
+        raise Reservation.DoesNotExist
+
+    monkeypatch.setattr(f"reservations.api.{action}_reservation", row_deleted)
+
+    response = _act(client, reservation.public_id, action)
+
+    assert response.status_code == 404
