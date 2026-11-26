@@ -29,7 +29,7 @@ For how stock changes are expressed:
 - **`available_quantity` is computed on read** (`total - allocated`), not stored, so there is no third counter that can drift.
 - **An unknown SKU and a product with no inventory row both return the same 404** (`{"detail": "Not Found"}`).
 - **Status codes:** 422 for an invalid body (handled by the schema), 409 when a valid request conflicts with current stock (`InsufficientStock`), 404 for a missing resource, including `Inventory.DoesNotExist` raised by the service.
-- **Strict request schema:** `quantity: int = Field(gt=0, strict=True)`. Pydantic's default lax mode converted `"3"` to `3` and `True` to `1`, which would let `{"quantity": true}` add one unit. The service layer's own checks remain as a second layer (ADR-0004), for callers that are not HTTP.
+- **Strict, bounded request schema:** `quantity: int = Field(gt=0, le=MAX_QUANTITY, strict=True)`, with `MAX_QUANTITY = 1_000_000`. Pydantic's default lax mode converted `"3"` to `3` and `True` to `1`, which would let `{"quantity": true}` add one unit. Pydantic's `int` has no upper bound, and the column is a 64-bit integer, so a huge quantity would reach PostgreSQL and fail with "bigint out of range", a 500. The cap rejects it at the boundary with a 422, as OWASP API4 advises for input limits. The service layer's own checks remain as a second layer (ADR-0004), for callers that are not HTTP.
 - **Exception mapping with `try/except` in each view**, raising `HttpError(..., ...) from exc` so the original exception stays in the chain for debugging. A central `exception_handler` is deferred until the repetition becomes a problem.
 - **`InvalidQuantity` is deliberately not caught.** The strict schema rejects bad input first, so if it ever fired the schema and service would disagree, which is a bug and should surface as a 500.
 - **Query count:** the read endpoint uses `select_related("product")` and runs one query, pinned by a test. The add endpoint runs four, and the test pins that number (see Consequences).
@@ -48,10 +48,11 @@ For how stock changes are expressed:
   - The 405 response is plain text rather than JSON (see ADR-0005).
   - The `Inventory.DoesNotExist` branch cannot be reached through the HTTP test client without a race, so the API tests simulate it with `monkeypatch` and the service tests cover the real behaviour.
   - `try/except` is repeated per endpoint.
+  - The cap limits one request, not the total. Repeated adds could in theory still reach the 64-bit limit, but at 1,000,000 per request that takes on the order of 9 trillion requests. A database `CHECK` on `total_quantity` would be the strict guarantee, at the cost of a migration, and is deferred.
 - **Revisit when:**
   - More endpoints share the same mapping, which suggests a central `exception_handler`.
   - Load testing shows the extra query matters.
-  - A maximum quantity is decided (the 64-bit column can currently overflow).
+  - A real adjustment can exceed 1,000,000 units, or the total needs a hard guarantee (add a `CHECK` constraint on `total_quantity`).
 
 ## References
 
