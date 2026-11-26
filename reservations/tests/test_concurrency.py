@@ -6,6 +6,7 @@ import pytest
 from django.db import connection, transaction
 
 from inventory.models import Inventory
+from inventory.reconciliation import find_discrepancies
 from inventory.services import InsufficientStock
 from inventory.tests.factories import InventoryFactory
 from reservations.models import Reservation
@@ -81,6 +82,8 @@ def test_concurrent_reservations_never_oversell():
     inventory, results = _race(_conditional_update_worker)
 
     _assert_no_oversell(inventory, results)
+    # The ledger agrees with the counters after the race.
+    assert find_discrepancies() == []
 
 
 @pytest.mark.django_db(transaction=True)
@@ -126,6 +129,7 @@ def test_concurrent_cancels_release_stock_exactly_once():
     assert reservation.status == Reservation.Status.CANCELLED
     # Released once: 3 allocated minus 3, not minus 30.
     assert inventory.allocated_quantity == 0
+    assert find_discrepancies() == []
 
 
 def _same_key_worker(inventory_pk: int, barrier: threading.Barrier) -> str:
@@ -156,3 +160,5 @@ def test_concurrent_requests_with_the_same_key_create_one_reservation():
     assert len(set(results)) == 1
     assert Reservation.objects.count() == 1
     assert inventory.allocated_quantity == 3
+    # A request that lost the race rolled back its ledger row with its stock.
+    assert find_discrepancies() == []
