@@ -1,7 +1,9 @@
 from django.shortcuts import get_object_or_404
 from ninja import Router, Schema
+from pydantic import Field
 
 from inventory.models import Inventory
+from inventory.services import add_stock
 
 router = Router(tags=["inventory"])
 
@@ -13,14 +15,32 @@ class InventoryOut(Schema):
     available_quantity: int
 
 
-@router.get("/products/{sku}/inventory", response=InventoryOut)
-def get_inventory(request, sku: str):
-    inventory = get_object_or_404(
+class StockChangeIn(Schema):
+    quantity: int = Field(gt=0, strict=True)
+
+
+def _get_inventory_or_404(sku: str) -> Inventory:
+    return get_object_or_404(
         Inventory.objects.select_related("product"), product__sku=sku
     )
+
+
+def _to_out(inventory: Inventory) -> InventoryOut:
     return InventoryOut(
         sku=inventory.product.sku,
         total_quantity=inventory.total_quantity,
         allocated_quantity=inventory.allocated_quantity,
         available_quantity=inventory.total_quantity - inventory.allocated_quantity,
     )
+
+
+@router.get("/products/{sku}/inventory", response=InventoryOut)
+def get_inventory(request, sku: str):
+    return _to_out(_get_inventory_or_404(sku))
+
+
+@router.post("/products/{sku}/inventory/add", response=InventoryOut)
+def add_inventory(request, sku: str, payload: StockChangeIn):
+    inventory = _get_inventory_or_404(sku)
+    add_stock(inventory, payload.quantity)
+    return _to_out(inventory)
