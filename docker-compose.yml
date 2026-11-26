@@ -67,7 +67,8 @@ services:
 
   worker:
     <<: *app
-    command: celery -A config worker -l info
+    # Expiry tasks are tiny, so two processes are plenty. Each holds a database connection.
+    command: celery -A config worker -l info --concurrency=2
 
   beat:
     <<: *app
