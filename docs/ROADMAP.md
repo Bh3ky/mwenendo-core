@@ -64,9 +64,9 @@
     > *Outcome:* Automated reservation lifecycle management.
     >
 - Milestone 7 - Load testing and benchmarks
-    - [ ]  Locust load scenarios.
-    - [ ]  Measure throughput, p95/p99 latency and error rates.
-    - [ ]  Write up the results as a benchmark report.
+    - [x]  Locust load scenarios.
+    - [x]  Measure throughput, p95/p99 latency and error rates.
+    - [x]  Write up the results as a benchmark report.
 
     > *Outcome:* Evidence that the system behaves correctly under load.
     >

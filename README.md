@@ -60,7 +60,7 @@ The system is being designed around the following principles:
 | Test data | Factory Boy | Reproducible test data generation |
 | Load testing | Locust | Concurrent request simulation |
 
-> *Note: Django, Django Ninja, PostgreSQL, pytest, Factory Boy and CI are in place. Celery, Redis and Locust will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
+> *Note: Django, Django Ninja, PostgreSQL, pytest, Factory Boy, Locust and CI are in place. Celery and Redis will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
 
 ## Core Design
 
@@ -106,7 +106,7 @@ PostgreSQL will remain the authoritative source of inventory state.
 - [x] Transaction management and row-level locking
 - [ ] Reservation state machine and idempotency
 - [ ] Celery and Redis integration
-- [ ] Locust load testing and performance benchmarking
+- [x] Locust load testing and performance benchmarking
 - [ ] Dockerisation and production deployment
 
 See the [full roadmap](docs/ROADMAP.md) for the detailed milestones.
