@@ -40,8 +40,8 @@
     - [ ]  Learn PostgreSQL row-level locking.
     - [ ]  Implement `transaction.atomic()`.
     - [ ]  Introduce `select_for_update()`.
-    - [ ]  Simulate competing reservation requests with a threaded concurrency test (`TransactionTestCase`).
-    - [ ]  Write ADR: pessimistic locking (`select_for_update`) vs optimistic locking.
+    - [x]  Simulate competing reservation requests with a threaded concurrency test (`TransactionTestCase`).
+    - [x]  Write ADR: pessimistic locking (`select_for_update`) vs optimistic locking.
 
     > *Outcome:* A reservation engine that protects inventory under concurrent requests.
     >
