@@ -1,3 +1,21 @@
+x-app: &app
+  build: .
+  image: mwenendo-core:local
+  restart: unless-stopped
+  # Secrets come from your .env. These override what must differ in a container.
+  env_file: .env
+  environment: &app-env
+    DEBUG: "False"
+    POSTGRES_HOST: db
+    POSTGRES_PORT: "5432"
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  profiles: ["app"]
+
 services:
   db:
     image: postgres:17
@@ -26,6 +44,29 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+
+  app:
+    <<: *app
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/')"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *app
+    command: celery -A config worker -l info
+
+  beat:
+    <<: *app
+    command: celery -A config beat -l info --schedule /tmp/celerybeat-schedule
 
 volumes:
   postgres_data:
