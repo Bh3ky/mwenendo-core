@@ -48,8 +48,8 @@
 - Milestone 5 - Finite State Machine and Idempotency
     - [x]  Implement permitted state transitions.
     - [x]  Prevent invalid transitions.
-    - [ ]  Introduce idempotency keys.
-    - [ ]  Handle duplicate requests and repeated operations.
+    - [x]  Introduce idempotency keys.
+    - [x]  Handle duplicate requests and repeated operations.
     - [ ]  Design and add an append-only stock movement ledger alongside the counters (with an ADR, revisiting ADR-0003).
 
     > *Outcome:* Predictable reservation lifecycle management.

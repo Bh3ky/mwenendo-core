@@ -125,7 +125,7 @@ def test_create_reservation_returns_404_if_the_row_vanishes_mid_request(
 ):
     InventoryFactory(product__sku="DEMO-1")
 
-    def row_deleted(inventory, quantity, reference):
+    def row_deleted(inventory, quantity, reference, idempotency_key=""):
         raise Inventory.DoesNotExist
 
     # Simulate the row being deleted between the lookup and the update,
@@ -224,3 +224,72 @@ def test_actions_return_404_if_the_reservation_vanishes_mid_request(
     response = _act(client, reservation.public_id, action)
 
     assert response.status_code == 404
+
+
+def _post_with_key(client, sku, body, key):
+    return client.post(
+        f"/api/products/{sku}/reservations",
+        data=body,
+        content_type="application/json",
+        headers={"Idempotency-Key": key},
+    )
+
+
+@pytest.mark.django_db
+def test_retrying_with_the_same_key_returns_the_same_reservation(client):
+    inventory = InventoryFactory(
+        product__sku="DEMO-1", total_quantity=10, allocated_quantity=0
+    )
+    body = {"quantity": 3, "reference": "order-1"}
+
+    first = _post_with_key(client, "DEMO-1", body, "key-1")
+    second = _post_with_key(client, "DEMO-1", body, "key-1")
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert second.json() == first.json()
+    inventory.refresh_from_db()
+    assert inventory.allocated_quantity == 3
+    assert Reservation.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_reusing_a_key_with_a_different_body_returns_422(client):
+    inventory = InventoryFactory(
+        product__sku="DEMO-1", total_quantity=10, allocated_quantity=0
+    )
+    _post_with_key(client, "DEMO-1", {"quantity": 3, "reference": "order-1"}, "key-1")
+
+    response = _post_with_key(
+        client, "DEMO-1", {"quantity": 4, "reference": "order-1"}, "key-1"
+    )
+
+    assert response.status_code == 422
+    assert "different request" in response.json()["detail"]
+    inventory.refresh_from_db()
+    assert inventory.allocated_quantity == 3
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("key", ["", "k" * 256])
+def test_an_invalid_idempotency_key_returns_422(client, key):
+    inventory = InventoryFactory(product__sku="DEMO-1", total_quantity=10)
+
+    response = _post_with_key(
+        client, "DEMO-1", {"quantity": 1, "reference": "order-1"}, key
+    )
+
+    assert response.status_code == 422
+    inventory.refresh_from_db()
+    assert inventory.allocated_quantity == 0
+
+
+@pytest.mark.django_db
+def test_requests_without_a_key_create_separate_reservations(client):
+    InventoryFactory(product__sku="DEMO-1", total_quantity=10)
+    body = {"quantity": 1, "reference": "order-1"}
+
+    _post(client, "DEMO-1", body)
+    _post(client, "DEMO-1", body)
+
+    assert Reservation.objects.count() == 2

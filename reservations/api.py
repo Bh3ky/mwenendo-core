@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from django.shortcuts import get_object_or_404
-from ninja import Router, Schema, Status
+from ninja import Header, Router, Schema, Status
 from ninja.errors import HttpError
 from pydantic import Field
 
@@ -11,6 +11,7 @@ from inventory.models import Inventory
 from inventory.services import InsufficientStock
 from reservations.models import Reservation
 from reservations.services import (
+    IdempotencyKeyReused,
     InvalidTransition,
     cancel_reservation,
     confirm_reservation,
@@ -46,11 +47,26 @@ def _to_out(reservation: Reservation, sku: str) -> ReservationOut:
 
 
 @router.post("/products/{sku}/reservations", response={201: ReservationOut})
-def create_reservation(request, sku: str, payload: ReservationIn):
+def create_reservation(
+    request,
+    sku: str,
+    payload: ReservationIn,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+):
+    if idempotency_key is not None and not 1 <= len(idempotency_key) <= 255:
+        raise HttpError(422, "Idempotency-Key must be 1 to 255 characters.")
+
     inventory = get_object_or_404(Inventory, product__sku=sku)
 
     try:
-        reservation = reserve_stock(inventory, payload.quantity, payload.reference)
+        reservation = reserve_stock(
+            inventory,
+            payload.quantity,
+            payload.reference,
+            idempotency_key=idempotency_key or "",
+        )
+    except IdempotencyKeyReused as exc:
+        raise HttpError(422, str(exc)) from exc
     except InsufficientStock as exc:
         raise HttpError(409, str(exc)) from exc
     except Inventory.DoesNotExist as exc:

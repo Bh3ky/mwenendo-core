@@ -126,3 +126,33 @@ def test_concurrent_cancels_release_stock_exactly_once():
     assert reservation.status == Reservation.Status.CANCELLED
     # Released once: 3 allocated minus 3, not minus 30.
     assert inventory.allocated_quantity == 0
+
+
+def _same_key_worker(inventory_pk: int, barrier: threading.Barrier) -> str:
+    try:
+        inventory = Inventory.objects.get(pk=inventory_pk)
+        barrier.wait(timeout=10)
+        reservation = reserve_stock(inventory, 3, "order-1", idempotency_key="key-1")
+        return str(reservation.public_id)
+    finally:
+        connection.close()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_requests_with_the_same_key_create_one_reservation():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=0)
+    barrier = threading.Barrier(CANCELLERS)
+
+    with ThreadPoolExecutor(max_workers=CANCELLERS) as pool:
+        futures = [
+            pool.submit(_same_key_worker, inventory.pk, barrier)
+            for _ in range(CANCELLERS)
+        ]
+        results = [future.result() for future in futures]
+
+    inventory.refresh_from_db()
+
+    # Every request got the same reservation back, and stock was held once.
+    assert len(set(results)) == 1
+    assert Reservation.objects.count() == 1
+    assert inventory.allocated_quantity == 3

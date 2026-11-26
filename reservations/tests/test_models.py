@@ -30,3 +30,28 @@ def test_zero_quantity_rejected():
             Reservation.objects.create(inventory=inventory, quantity=0, reference="r")
 
     assert "reservation_quantity_gt_zero" in str(excinfo.value)
+
+
+@pytest.mark.django_db
+def test_two_reservations_cannot_share_an_idempotency_key():
+    inventory = InventoryFactory()
+    ReservationFactory(inventory=inventory, idempotency_key="key-1")
+
+    with pytest.raises(IntegrityError) as excinfo:
+        with transaction.atomic():
+            Reservation.objects.create(
+                inventory=inventory,
+                quantity=1,
+                reference="r",
+                idempotency_key="key-1",
+            )
+
+    assert "reservation_idempotency_key_unique" in str(excinfo.value)
+
+
+@pytest.mark.django_db
+def test_reservations_without_a_key_do_not_collide():
+    ReservationFactory()
+    ReservationFactory()
+
+    assert Reservation.objects.filter(idempotency_key="").count() == 2
