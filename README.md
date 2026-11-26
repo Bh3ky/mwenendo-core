@@ -66,7 +66,7 @@ The system is being designed around the following principles:
 
 ### Inventory Allocation
 
-PostgreSQL row-level locking using `SELECT FOR UPDATE` will be used to coordinate competing transactions attempting to allocate the same inventory.
+Competing requests for the same inventory are coordinated by PostgreSQL's row-level locking. Allocation is a single conditional `UPDATE` that checks and writes in one statement, so two requests cannot both claim the last units. `SELECT FOR UPDATE` is the alternative for when a decision needs more than the counter. A threaded test covers both. See [ADR-0008](docs/adr/0008-conditional-update-for-concurrent-allocation.md).
 
 The central invariant is:
 
