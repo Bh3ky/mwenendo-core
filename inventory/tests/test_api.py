@@ -120,3 +120,93 @@ def test_add_inventory_query_count(client, django_assert_num_queries):
             data={"quantity": 5},
             content_type="application/json",
         )
+
+
+@pytest.mark.django_db
+def test_remove_inventory_conflicts_when_stock_is_allocated(client):
+    inventory = InventoryFactory(
+        product__sku="DEMO-1", total_quantity=10, allocated_quantity=3
+    )
+
+    response = client.post(
+        "/api/products/DEMO-1/inventory/remove",
+        data={"quantity": 8},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 409
+    assert "only 7 are unallocated" in response.json()["detail"]
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 10
+
+
+@pytest.mark.django_db
+def test_remove_inventory_decreases_total(client):
+    inventory = InventoryFactory(
+        product__sku="DEMO-1", total_quantity=10, allocated_quantity=3
+    )
+
+    response = client.post(
+        "/api/products/DEMO-1/inventory/remove",
+        data={"quantity": 4},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "sku": "DEMO-1",
+        "total_quantity": 6,
+        "allocated_quantity": 3,
+        "available_quantity": 3,
+    }
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 6
+
+
+@pytest.mark.django_db
+def test_remove_inventory_allows_removing_exactly_the_unallocated_amount(client):
+    inventory = InventoryFactory(
+        product__sku="DEMO-1", total_quantity=10, allocated_quantity=3
+    )
+
+    response = client.post(
+        "/api/products/DEMO-1/inventory/remove",
+        data={"quantity": 7},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["available_quantity"] == 0
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 3
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("bad_quantity", [0, -5, 2.5, True, "5"])
+def test_remove_inventory_rejects_invalid_quantities(client, bad_quantity):
+    inventory = InventoryFactory(
+        product__sku="DEMO-1", total_quantity=10, allocated_quantity=3
+    )
+
+    response = client.post(
+        "/api/products/DEMO-1/inventory/remove",
+        data={"quantity": bad_quantity},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 422
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 10
+
+
+@pytest.mark.django_db
+def test_remove_inventory_unknown_sku_returns_404(client):
+    response = client.post(
+        "/api/products/NOPE/inventory/remove",
+        data={"quantity": 5},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+    assert "application/json" in response["Content-Type"]
