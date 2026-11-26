@@ -1,5 +1,6 @@
 import pytest
 
+from inventory.api import MAX_QUANTITY
 from inventory.models import Inventory
 from inventory.tests.factories import InventoryFactory, ProductFactory
 
@@ -260,6 +261,41 @@ def test_stock_endpoints_reject_missing_body(client, action):
 
     response = client.post(
         f"/api/products/DEMO-1/inventory/{action}",
+        content_type="application/json",
+    )
+
+    assert response.status_code == 422
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == 10
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("action", "expected_total"),
+    [("add", 2 * MAX_QUANTITY), ("remove", 0)],
+)
+def test_stock_endpoints_accept_the_maximum_quantity(client, action, expected_total):
+    inventory = InventoryFactory(product__sku="DEMO-1", total_quantity=MAX_QUANTITY)
+
+    response = client.post(
+        f"/api/products/DEMO-1/inventory/{action}",
+        data={"quantity": MAX_QUANTITY},
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    inventory.refresh_from_db()
+    assert inventory.total_quantity == expected_total
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_stock_endpoints_reject_quantity_above_the_maximum(client, action):
+    inventory = InventoryFactory(product__sku="DEMO-1", total_quantity=10)
+
+    response = client.post(
+        f"/api/products/DEMO-1/inventory/{action}",
+        data={"quantity": MAX_QUANTITY + 1},
         content_type="application/json",
     )
 
