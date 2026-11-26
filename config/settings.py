@@ -133,3 +133,22 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# Reservations
+# How long a pending reservation holds stock before it expires (ADR-0012).
+RESERVATION_TTL_MINUTES = env.int("RESERVATION_TTL_MINUTES", default=15)
+
+# Celery (background tasks)
+CELERY_BROKER_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+# Tests run tasks inline so they need no Redis. Never set this in production.
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+# Acknowledge a task only after it finishes, so a crashed worker's task is retried.
+CELERY_TASK_ACKS_LATE = True
+CELERY_BEAT_SCHEDULE = {
+    # The safety net: expires anything the per-reservation tasks missed.
+    "expire-overdue-reservations": {
+        "task": "reservations.tasks.expire_overdue_reservations",
+        "schedule": 60.0,
+    },
+}

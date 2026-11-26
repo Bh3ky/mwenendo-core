@@ -66,3 +66,5 @@ dist/
 
 # docs (personal learning notes stay private; everything else in docs/ is published)
 docs/NOTES.md
+# Celery beat state
+celerybeat-schedule*
