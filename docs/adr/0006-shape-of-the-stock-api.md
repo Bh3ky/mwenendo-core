@@ -46,7 +46,7 @@ For how stock changes are expressed:
   - Verbs in URLs are not strictly RESTful.
   - The add endpoint runs four queries, not three. `refresh_from_db()` at the end of `add_stock` discards the product that `select_related` loaded, so reading `inventory.product.sku` fetches it again. This is the N+1 pattern in miniature and harmless for one row, but it would matter in a loop. We accepted it and pinned it with a test, to optimise only when measurement says it matters (Milestone 7).
   - The 405 response is plain text rather than JSON (see ADR-0005).
-  - The `Inventory.DoesNotExist` branch cannot be reached through the HTTP test client without a race, so it is covered by the service tests only.
+  - The `Inventory.DoesNotExist` branch cannot be reached through the HTTP test client without a race, so the API tests simulate it with `monkeypatch` and the service tests cover the real behaviour.
   - `try/except` is repeated per endpoint.
 - **Revisit when:**
   - More endpoints share the same mapping, which suggests a central `exception_handler`.
