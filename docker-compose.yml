@@ -47,6 +47,11 @@ services:
 
   app:
     <<: *app
+    environment:
+      <<: *app-env
+      # Only the web server counts requests, so only it needs this. The directory
+      # is emptied each time gunicorn starts (see gunicorn.conf.py).
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus-multiproc
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     healthcheck:
