@@ -172,6 +172,22 @@ The application will be available at:
 - Landing page: `http://127.0.0.1:8000/`
 - Health check: `http://127.0.0.1:8000/health/`
 
+### Running the whole system in containers
+
+The steps above run the app from your terminal. To run the application, a Celery worker and Celery beat in containers, behind gunicorn, use the `app` profile. These services are off by default, so `docker compose up -d` still starts only PostgreSQL and Redis.
+
+```bash
+docker compose --profile app up -d --build
+docker compose run --rm app python manage.py migrate
+docker compose --profile app ps
+```
+
+Run `migrate` as its own step. If several app containers ran it on start-up, they could race each other.
+
+The application is then at `http://127.0.0.1:8000/` (change the port with `APP_PORT` in `.env`), with the interactive API docs at `/api/docs` and the admin at `/admin/`. Create an admin user with `docker compose run --rm app python manage.py createsuperuser`. Logs are in `docker compose logs -f app worker beat`.
+
+The containers read `.env`, but override what must differ inside Docker: the database host, the Redis URL and `DEBUG=False`. Secrets are never copied into the image.
+
 ## Testing
 
 Run the tests and linters (PostgreSQL must be running):
