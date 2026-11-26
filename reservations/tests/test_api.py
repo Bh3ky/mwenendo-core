@@ -293,3 +293,36 @@ def test_requests_without_a_key_create_separate_reservations(client):
     _post(client, "DEMO-1", body)
 
     assert Reservation.objects.count() == 2
+
+
+@pytest.mark.django_db
+def test_a_new_reservation_reports_when_it_expires(client):
+    InventoryFactory(product__sku="DEMO-1", total_quantity=10)
+
+    response = _post(client, "DEMO-1", {"quantity": 1, "reference": "order-1"})
+
+    assert response.status_code == 201
+    assert response.json()["expires_at"] is not None
+
+
+@pytest.mark.django_db
+def test_confirming_an_overdue_reservation_returns_409(client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    reservation = ReservationFactory(expires_at=timezone.now() - timedelta(minutes=1))
+
+    response = _act(client, reservation.public_id, "confirm")
+
+    assert response.status_code == 409
+    assert "expired" in response.json()["detail"]
+
+
+@pytest.mark.django_db
+def test_confirming_an_expired_reservation_returns_409(client):
+    reservation = ReservationFactory(status="expired")
+
+    response = _act(client, reservation.public_id, "confirm")
+
+    assert response.status_code == 409

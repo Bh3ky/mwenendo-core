@@ -1,10 +1,18 @@
+import logging
 import uuid
+from datetime import timedelta
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils import timezone
 
 from inventory.models import Inventory
 from inventory.services import allocate_stock, release_stock
 from reservations.models import Reservation
+from reservations.tasks import schedule_expiry
+
+logger = logging.getLogger(__name__)
 
 
 class IdempotencyKeyReused(Exception):
@@ -49,14 +57,21 @@ def reserve_stock(
     try:
         with transaction.atomic():
             public_id = uuid.uuid4()
+            ttl = timedelta(minutes=settings.RESERVATION_TTL_MINUTES)
             allocate_stock(inventory, quantity, reservation_public_id=public_id)
-            return Reservation.objects.create(
+            reservation = Reservation.objects.create(
                 public_id=public_id,
+                expires_at=timezone.now() + ttl,
                 inventory=inventory,
                 quantity=quantity,
                 reference=reference,
                 idempotency_key=idempotency_key,
             )
+            # Runs only once the transaction commits, so the task can never
+            # fire before the reservation exists. The periodic sweep is the
+            # safety net if scheduling fails.
+            schedule_expiry(reservation.public_id, ttl + timedelta(seconds=1))
+            return reservation
     except IntegrityError:
         # Two requests with the same key can both miss the lookup above. The
         # unique constraint lets only one insert win, and the loser's stock
@@ -78,24 +93,35 @@ class InvalidTransition(Exception):
 # The single source of truth for the lifecycle: from-state -> allowed to-states.
 Status = Reservation.Status
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
-    Status.PENDING: {Status.CONFIRMED, Status.CANCELLED},
+    Status.PENDING: {Status.CONFIRMED, Status.CANCELLED, Status.EXPIRED},
     Status.CONFIRMED: {Status.CANCELLED},
     Status.CANCELLED: set(),
+    Status.EXPIRED: set(),
 }
 
 
-def _transition(reservation: Reservation, to_status: str) -> None:
-    allowed_from = [
+def _allowed_from(to_status: str) -> list[str]:
+    return [
         from_status
         for from_status, targets in ALLOWED_TRANSITIONS.items()
         if to_status in targets
     ]
 
+
+def _not_overdue() -> Q:
+    return Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())
+
+
+def _transition(
+    reservation: Reservation, to_status: str, only_if: Q | None = None
+) -> None:
+    conditions = Q(pk=reservation.pk, status__in=_allowed_from(to_status))
+    if only_if is not None:
+        conditions &= only_if
+
     # One conditional UPDATE: the state check and the write are the same
     # statement, so of two competing requests only one can match.
-    updated = Reservation.objects.filter(
-        pk=reservation.pk, status__in=allowed_from
-    ).update(status=to_status)
+    updated = Reservation.objects.filter(conditions).update(status=to_status)
 
     if updated == 0:
         if not Reservation.objects.filter(pk=reservation.pk).exists():
@@ -104,6 +130,10 @@ def _transition(reservation: Reservation, to_status: str) -> None:
             )
 
         reservation.refresh_from_db()
+        if only_if is not None and reservation.status == Status.PENDING:
+            raise InvalidTransition(
+                "The reservation has expired and can no longer be confirmed."
+            )
         raise InvalidTransition(
             f"Cannot move a {reservation.status} reservation to {to_status}."
         )
@@ -112,7 +142,9 @@ def _transition(reservation: Reservation, to_status: str) -> None:
 
 
 def confirm_reservation(reservation: Reservation) -> None:
-    _transition(reservation, Status.CONFIRMED)
+    # A pending reservation past its deadline cannot be confirmed, even in the
+    # moments before the expiry task gets to it.
+    _transition(reservation, Status.CONFIRMED, only_if=_not_overdue())
 
 
 def cancel_reservation(reservation: Reservation) -> None:
@@ -128,3 +160,56 @@ def cancel_reservation(reservation: Reservation) -> None:
             reservation.quantity,
             reservation_public_id=reservation.public_id,
         )
+
+
+def expire_reservation(reservation: Reservation) -> bool:
+    """Expire one overdue pending reservation and give its stock back.
+
+    Returns True if this call expired it, False if there was nothing to do
+    (already confirmed, cancelled or expired, or not due yet). Safe to repeat,
+    and of two competing calls only one releases the stock.
+    """
+    with transaction.atomic():
+        updated = Reservation.objects.filter(
+            pk=reservation.pk,
+            status__in=_allowed_from(Status.EXPIRED),
+            expires_at__lte=timezone.now(),
+        ).update(status=Status.EXPIRED)
+
+        if updated == 0:
+            return False
+
+        reservation.refresh_from_db()
+        release_stock(
+            reservation.inventory,
+            reservation.quantity,
+            reservation_public_id=reservation.public_id,
+        )
+        return True
+
+
+SWEEP_BATCH_SIZE = 500
+
+
+def expire_overdue_reservations(limit: int = SWEEP_BATCH_SIZE) -> int:
+    """Expire every overdue pending reservation, up to `limit`. Returns how many.
+
+    The safety net behind the per-reservation tasks. One bad reservation is
+    logged and skipped, so it cannot block the rest.
+    """
+    overdue = (
+        Reservation.objects.filter(
+            status__in=_allowed_from(Status.EXPIRED), expires_at__lte=timezone.now()
+        )
+        .select_related("inventory")
+        .order_by("expires_at")[:limit]
+    )
+
+    expired = 0
+    for reservation in list(overdue):
+        try:
+            if expire_reservation(reservation):
+                expired += 1
+        except Exception:
+            logger.exception("Could not expire reservation %s", reservation.public_id)
+    return expired

@@ -60,7 +60,7 @@ The system is being designed around the following principles:
 | Test data | Factory Boy | Reproducible test data generation |
 | Load testing | Locust | Concurrent request simulation |
 
-> *Note: Django, Django Ninja, PostgreSQL, pytest, Factory Boy, Locust and CI are in place. Celery and Redis will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
+> *Note: Django, Django Ninja, PostgreSQL, pytest, Factory Boy, Locust, Celery, Redis and CI are in place. The remaining roadmap items follow incrementally; see the [roadmap](docs/ROADMAP.md).*
 
 ## Core Design
 
@@ -90,7 +90,7 @@ Each transition will have explicit validation and corresponding inventory effect
 
 ### Asynchronous Processing
 
-Celery workers will handle operations such as reservation expiry and background cleanup.
+Celery workers expire overdue reservations and give their stock back, using a delayed task per reservation and a periodic sweep as a safety net. See [ADR-0012](docs/adr/0012-reservation-expiry.md).
 
 PostgreSQL will remain the authoritative source of inventory state.
 
@@ -105,7 +105,7 @@ PostgreSQL will remain the authoritative source of inventory state.
 - [x] Reservation API
 - [x] Transaction management and row-level locking
 - [ ] Reservation state machine and idempotency
-- [ ] Celery and Redis integration
+- [x] Celery and Redis integration
 - [x] Locust load testing and performance benchmarking
 - [ ] Dockerisation and production deployment
 

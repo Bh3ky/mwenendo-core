@@ -1,16 +1,23 @@
 import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 
 import pytest
 from django.db import connection, transaction
+from django.utils import timezone
 
 from inventory.models import Inventory
 from inventory.reconciliation import find_discrepancies
 from inventory.services import InsufficientStock
 from inventory.tests.factories import InventoryFactory
 from reservations.models import Reservation
-from reservations.services import InvalidTransition, cancel_reservation, reserve_stock
+from reservations.services import (
+    InvalidTransition,
+    cancel_reservation,
+    expire_reservation,
+    reserve_stock,
+)
 from reservations.tests.factories import ReservationFactory
 
 THREADS = 30
@@ -161,4 +168,40 @@ def test_concurrent_requests_with_the_same_key_create_one_reservation():
     assert Reservation.objects.count() == 1
     assert inventory.allocated_quantity == 3
     # A request that lost the race rolled back its ledger row with its stock.
+    assert find_discrepancies() == []
+
+
+def _expire_worker(reservation_pk: int, barrier: threading.Barrier) -> str:
+    try:
+        reservation = Reservation.objects.get(pk=reservation_pk)
+        barrier.wait(timeout=10)
+        return "expired" if expire_reservation(reservation) else "skipped"
+    finally:
+        connection.close()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_expiry_releases_stock_exactly_once():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=3)
+    reservation = ReservationFactory(
+        inventory=inventory,
+        quantity=3,
+        expires_at=timezone.now() - timedelta(minutes=1),
+    )
+    barrier = threading.Barrier(CANCELLERS)
+
+    with ThreadPoolExecutor(max_workers=CANCELLERS) as pool:
+        futures = [
+            pool.submit(_expire_worker, reservation.pk, barrier)
+            for _ in range(CANCELLERS)
+        ]
+        results = [future.result() for future in futures]
+
+    inventory.refresh_from_db()
+    reservation.refresh_from_db()
+
+    assert results.count("expired") == 1
+    assert results.count("skipped") == CANCELLERS - 1
+    assert reservation.status == Reservation.Status.EXPIRED
+    assert inventory.allocated_quantity == 0
     assert find_discrepancies() == []
