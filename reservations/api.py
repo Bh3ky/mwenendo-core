@@ -10,7 +10,12 @@ from core.limits import MAX_QUANTITY
 from inventory.models import Inventory
 from inventory.services import InsufficientStock
 from reservations.models import Reservation
-from reservations.services import reserve_stock
+from reservations.services import (
+    InvalidTransition,
+    cancel_reservation,
+    confirm_reservation,
+    reserve_stock,
+)
 
 router = Router(tags=["reservations"])
 
@@ -62,3 +67,30 @@ def get_reservation(request, public_id: uuid.UUID):
         public_id=public_id,
     )
     return _to_out(reservation, reservation.inventory.product.sku)
+
+
+def _change_state(public_id: uuid.UUID, action) -> ReservationOut:
+    reservation = get_object_or_404(
+        Reservation.objects.select_related("inventory__product"),
+        public_id=public_id,
+    )
+    sku = reservation.inventory.product.sku
+
+    try:
+        action(reservation)
+    except InvalidTransition as exc:
+        raise HttpError(409, str(exc)) from exc
+    except Reservation.DoesNotExist as exc:
+        raise HttpError(404, "Not Found") from exc
+
+    return _to_out(reservation, sku)
+
+
+@router.post("/reservations/{public_id}/confirm", response=ReservationOut)
+def confirm(request, public_id: uuid.UUID):
+    return _change_state(public_id, confirm_reservation)
+
+
+@router.post("/reservations/{public_id}/cancel", response=ReservationOut)
+def cancel(request, public_id: uuid.UUID):
+    return _change_state(public_id, cancel_reservation)

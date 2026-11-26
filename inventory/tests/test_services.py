@@ -7,6 +7,7 @@ from inventory.services import (
     StockError,
     add_stock,
     allocate_stock,
+    release_stock,
     remove_stock,
 )
 from inventory.tests.factories import InventoryFactory
@@ -199,3 +200,45 @@ def test_allocate_stock_raises_does_not_exist_for_deleted_inventory():
 
     with pytest.raises(Inventory.DoesNotExist, match=r"Inventory \d+ does not exist"):
         allocate_stock(inventory, 5)
+
+
+@pytest.mark.django_db
+def test_release_stock_decreases_allocated_quantity():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+
+    release_stock(inventory, 3)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 2
+    assert inventory.allocated_quantity == 2
+
+
+@pytest.mark.django_db
+def test_release_stock_rejects_releasing_more_than_is_allocated():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=2)
+
+    with pytest.raises(StockError) as exc_info:
+        release_stock(inventory, 3)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 2
+    assert "only 2 are allocated" in str(exc_info.value)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("bad_quantity", [0, -5, 2.5, True, "3"])
+def test_release_stock_rejects_invalid_quantities(bad_quantity):
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
+
+    with pytest.raises(InvalidQuantity):
+        release_stock(inventory, bad_quantity)
+
+    assert Inventory.objects.get(pk=inventory.pk).allocated_quantity == 5
+
+
+@pytest.mark.django_db
+def test_release_stock_raises_does_not_exist_for_deleted_inventory():
+    inventory = InventoryFactory()
+
+    Inventory.objects.filter(pk=inventory.pk).delete()
+
+    with pytest.raises(Inventory.DoesNotExist, match=r"Inventory \d+ does not exist"):
+        release_stock(inventory, 1)

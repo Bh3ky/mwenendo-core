@@ -46,8 +46,8 @@
     > *Outcome:* A reservation engine that protects inventory under concurrent requests.
     >
 - Milestone 5 - Finite State Machine and Idempotency
-    - [ ]  Implement permitted state transitions.
-    - [ ]  Prevent invalid transitions.
+    - [x]  Implement permitted state transitions.
+    - [x]  Prevent invalid transitions.
     - [ ]  Introduce idempotency keys.
     - [ ]  Handle duplicate requests and repeated operations.
     - [ ]  Design and add an append-only stock movement ledger alongside the counters (with an ADR, revisiting ADR-0003).
