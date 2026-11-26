@@ -15,6 +15,22 @@ from reservations.tasks import schedule_expiry
 logger = logging.getLogger(__name__)
 
 
+def _log_after_commit(event: str, reservation: Reservation) -> None:
+    """Log an event only if the surrounding transaction commits."""
+    transaction.on_commit(lambda: _log_event(event, reservation))
+
+
+def _log_event(event: str, reservation: Reservation) -> None:
+    logger.info(
+        event,
+        extra={
+            "reservation_id": str(reservation.public_id),
+            "inventory_id": reservation.inventory_id,
+            "quantity": reservation.quantity,
+        },
+    )
+
+
 class IdempotencyKeyReused(Exception):
     """The key was already used for a different request."""
 
@@ -71,6 +87,8 @@ def reserve_stock(
             # fire before the reservation exists. The periodic sweep is the
             # safety net if scheduling fails.
             schedule_expiry(reservation.public_id, ttl + timedelta(seconds=1))
+            # Logged only once the transaction has committed.
+            _log_after_commit("reservation.created", reservation)
             return reservation
     except IntegrityError:
         # Two requests with the same key can both miss the lookup above. The
@@ -145,6 +163,7 @@ def confirm_reservation(reservation: Reservation) -> None:
     # A pending reservation past its deadline cannot be confirmed, even in the
     # moments before the expiry task gets to it.
     _transition(reservation, Status.CONFIRMED, only_if=_not_overdue())
+    _log_after_commit("reservation.confirmed", reservation)
 
 
 def cancel_reservation(reservation: Reservation) -> None:
@@ -160,6 +179,7 @@ def cancel_reservation(reservation: Reservation) -> None:
             reservation.quantity,
             reservation_public_id=reservation.public_id,
         )
+        _log_after_commit("reservation.cancelled", reservation)
 
 
 def expire_reservation(reservation: Reservation) -> bool:
@@ -185,6 +205,7 @@ def expire_reservation(reservation: Reservation) -> bool:
             reservation.quantity,
             reservation_public_id=reservation.public_id,
         )
+        _log_after_commit("reservation.expired", reservation)
         return True
 
 

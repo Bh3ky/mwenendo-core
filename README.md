@@ -184,7 +184,7 @@ docker compose --profile app ps
 
 Run `migrate` as its own step. If several app containers ran it on start-up, they could race each other.
 
-The application is then at `http://127.0.0.1:8000/` (change the port with `APP_PORT` in `.env`), with the interactive API docs at `/api/docs` and the admin at `/admin/`. Create an admin user with `docker compose run --rm app python manage.py createsuperuser`. Logs are in `docker compose logs -f app worker beat`.
+The application is then at `http://127.0.0.1:8000/` (change the port with `APP_PORT` in `.env`), with the interactive API docs at `/api/docs` and the admin at `/admin/`. Create an admin user with `docker compose run --rm app python manage.py createsuperuser`. Logs are in `docker compose logs -f app worker beat`, one JSON object per line (set `LOG_LEVEL` to change the level), and each response carries an `X-Request-ID` header you can search for. `/health/` says the process is alive, and `/health/ready/` says whether it can take traffic: it returns 503 if the database is down, and reports Redis without failing on it.
 
 The containers read `.env`, but override what must differ inside Docker: the database host, the Redis URL and `DEBUG=False`. Secrets are never copied into the image.
 
