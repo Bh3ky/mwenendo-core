@@ -60,7 +60,7 @@ The system is being designed around the following principles:
 | Test data | Factory Boy | Reproducible test data generation |
 | Load testing | Locust | Concurrent request simulation |
 
-> *Note: Django, PostgreSQL, pytest and CI are in place. Django Ninja, Celery, Redis, Factory Boy and Locust will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
+> *Note: Django, Django Ninja, PostgreSQL, pytest, Factory Boy and CI are in place. Celery, Redis and Locust will be introduced incrementally; see the [roadmap](docs/ROADMAP.md).*
 
 ## Core Design
 
