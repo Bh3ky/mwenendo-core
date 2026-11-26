@@ -2,6 +2,7 @@ import pytest
 from django.db import DataError
 from django.db.models import Sum
 
+from inventory.models import StockMovement
 from inventory.services import InsufficientStock, StockError
 from inventory.tests.factories import InventoryFactory
 from reservations.models import Reservation
@@ -124,7 +125,7 @@ def test_cancel_rolls_back_the_status_if_releasing_stock_fails(monkeypatch):
     inventory = InventoryFactory(total_quantity=10, allocated_quantity=5)
     reservation = ReservationFactory(inventory=inventory, quantity=3)
 
-    def release_fails(inventory, quantity):
+    def release_fails(inventory, quantity, reservation_public_id=None):
         raise StockError("boom")
 
     monkeypatch.setattr("reservations.services.release_stock", release_fails)
@@ -183,3 +184,26 @@ def test_requests_without_a_key_are_not_deduplicated():
     inventory.refresh_from_db()
     assert Reservation.objects.count() == 2
     assert inventory.allocated_quantity == 2
+
+
+@pytest.mark.django_db
+def test_reserving_writes_a_ledger_row_linked_to_the_reservation():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=0)
+
+    reservation = reserve_stock(inventory, 3, "order-1")
+
+    movement = StockMovement.objects.get(reservation_public_id=reservation.public_id)
+    assert movement.reason == StockMovement.Reason.RESERVED
+    assert movement.allocated_delta == 3
+
+
+@pytest.mark.django_db
+def test_cancelling_writes_a_ledger_row_linked_to_the_reservation():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=3)
+    reservation = ReservationFactory(inventory=inventory, quantity=3)
+
+    cancel_reservation(reservation)
+
+    movement = StockMovement.objects.get(reservation_public_id=reservation.public_id)
+    assert movement.reason == StockMovement.Reason.RELEASED
+    assert movement.allocated_delta == -3

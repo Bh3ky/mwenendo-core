@@ -111,12 +111,16 @@ def test_add_inventory_rejects_unknown_sku(client):
 
 
 # test: check that the endpoint isn't making hidden extra
-# database calls
+# database calls.
+# 5 real statements: the lookup (with the product JOIN), the UPDATE, the ledger
+# INSERT, the refresh, and the product again (refresh_from_db drops the cached
+# product). The other 2 are SAVEPOINT and RELEASE SAVEPOINT: the service's
+# atomic() becomes a savepoint because the test already runs in a transaction.
 @pytest.mark.django_db
 def test_add_inventory_query_count(client, django_assert_num_queries):
     InventoryFactory(product__sku="DEMO-1")
 
-    with django_assert_num_queries(4):
+    with django_assert_num_queries(7):
         client.post(
             "/api/products/DEMO-1/inventory/add",
             data={"quantity": 5},

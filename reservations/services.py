@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import IntegrityError, transaction
 
 from inventory.models import Inventory
@@ -46,8 +48,10 @@ def reserve_stock(
 
     try:
         with transaction.atomic():
-            allocate_stock(inventory, quantity)
+            public_id = uuid.uuid4()
+            allocate_stock(inventory, quantity, reservation_public_id=public_id)
             return Reservation.objects.create(
+                public_id=public_id,
                 inventory=inventory,
                 quantity=quantity,
                 reference=reference,
@@ -119,4 +123,8 @@ def cancel_reservation(reservation: Reservation) -> None:
     """
     with transaction.atomic():
         _transition(reservation, Status.CANCELLED)
-        release_stock(reservation.inventory, reservation.quantity)
+        release_stock(
+            reservation.inventory,
+            reservation.quantity,
+            reservation_public_id=reservation.public_id,
+        )

@@ -59,7 +59,8 @@ def test_add_stock_handles_two_stale_inventory_objects():
 
 @pytest.mark.django_db
 def test_add_stock_raises_does_not_exist_for_deleted_inventory():
-    inventory = InventoryFactory()
+    # No ledger rows, or the PROTECT foreign key would refuse the delete.
+    inventory = InventoryFactory(opening_balance=False)
 
     Inventory.objects.filter(pk=inventory.pk).delete()
 
@@ -137,7 +138,8 @@ def test_remove_stock_rejects_invalid_quantities(bad_quantity):
 
 @pytest.mark.django_db
 def test_remove_stock_raises_does_not_exist_for_deleted_inventory():
-    inventory = InventoryFactory()
+    # No ledger rows, or the PROTECT foreign key would refuse the delete.
+    inventory = InventoryFactory(opening_balance=False)
 
     Inventory.objects.filter(pk=inventory.pk).delete()
 
@@ -194,7 +196,8 @@ def test_allocate_stock_rejects_invalid_quantities(bad_quantity):
 
 @pytest.mark.django_db
 def test_allocate_stock_raises_does_not_exist_for_deleted_inventory():
-    inventory = InventoryFactory()
+    # No ledger rows, or the PROTECT foreign key would refuse the delete.
+    inventory = InventoryFactory(opening_balance=False)
 
     Inventory.objects.filter(pk=inventory.pk).delete()
 
@@ -236,7 +239,8 @@ def test_release_stock_rejects_invalid_quantities(bad_quantity):
 
 @pytest.mark.django_db
 def test_release_stock_raises_does_not_exist_for_deleted_inventory():
-    inventory = InventoryFactory()
+    # No ledger rows, or the PROTECT foreign key would refuse the delete.
+    inventory = InventoryFactory(opening_balance=False)
 
     Inventory.objects.filter(pk=inventory.pk).delete()
 
