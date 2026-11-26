@@ -40,7 +40,11 @@ for _ in $(seq 30); do
   curl -sf "http://127.0.0.1:$PORT/health/" > /dev/null && break
   sleep 1
 done
-curl -sf "http://127.0.0.1:$PORT/health/" > /dev/null || { echo "Server did not start." >&2; exit 1; }
+if ! curl -sf "http://127.0.0.1:$PORT/health/" > /dev/null; then
+  echo "Server did not start. The end of its log:" >&2
+  tail -n 15 "loadtests/results/$LABEL-gunicorn.log" >&2
+  exit 1
+fi
 
 run() {  # run <scenario> <prefix> <sku count>
   echo "Running $1 for $DURATION with $USERS users..."
