@@ -55,11 +55,11 @@
     > *Outcome:* Predictable reservation lifecycle management.
     >
 - Milestone 6 - Background processing
-    - [ ]  Configure Celery and Redis.
+    - [x]  Configure Celery and Redis.
     - [x]  Implement reservation expiry.
     - [x]  Add a periodic expiry sweep as a safety net alongside per-reservation tasks.
     - [ ]  Handle retries and task failures.
-    - [ ]  Introduce transaction commit hooks (`transaction.on_commit`) and, optionally, an outbox pattern (with an ADR).
+    - [x]  Introduce transaction commit hooks (`transaction.on_commit`) and, optionally, an outbox pattern (with an ADR).
 
     > *Outcome:* Automated reservation lifecycle management.
     >
