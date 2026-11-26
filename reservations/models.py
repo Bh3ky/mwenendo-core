@@ -26,6 +26,8 @@ class Reservation(models.Model):
         default=Status.PENDING,
     )
     reference = models.CharField(max_length=255)
+    # Empty means the client sent no key. Real keys must be unique.
+    idempotency_key = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -33,6 +35,11 @@ class Reservation(models.Model):
             models.CheckConstraint(
                 condition=Q(quantity__gt=0),
                 name="reservation_quantity_gt_zero",
+            ),
+            models.UniqueConstraint(
+                fields=["idempotency_key"],
+                condition=~Q(idempotency_key=""),
+                name="reservation_idempotency_key_unique",
             ),
         ]
 
