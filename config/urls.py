@@ -19,9 +19,11 @@ from django.contrib import admin
 from django.urls import include, path
 
 from config.api import api
+from config.metrics import metrics_view
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", api.urls),
+    path("metrics", metrics_view, name="metrics"),
     path("", include("core.urls")),
 ]

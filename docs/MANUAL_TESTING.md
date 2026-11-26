@@ -100,6 +100,57 @@ uv run python manage.py reconcile_stock
 
 Expect "All inventories reconcile." The expiries wrote ledger rows too.
 
+## Metrics with several gunicorn workers
+
+Tests cannot show four real worker processes adding up, so check it by hand.
+You need the containers: `docker compose --profile app up -d --build`.
+
+1. Count the files the workers write (one set per worker process):
+
+   ```bash
+   docker compose exec app ls /tmp/prometheus-multiproc
+   ```
+
+   Expect files like `counter_<pid>.db` and `histogram_<pid>.db` for several pids.
+
+2. Send exactly 20 requests, then read the count. Use a route nothing else has hit:
+
+   ```bash
+   for i in $(seq 20); do curl -s -o /dev/null http://127.0.0.1:8000/health/; done
+   curl -s http://127.0.0.1:8000/metrics | grep 'http_requests_total{.*route="health/"'
+   ```
+
+   **Expect a count of exactly 20** (plus any earlier `/health/` calls, such as the
+   container's own health check, which runs every 10 seconds, so allow a few extra).
+   If it were not adding the workers up, you would see roughly a quarter of that.
+
+3. Scrape twice in a row:
+
+   ```bash
+   curl -s http://127.0.0.1:8000/metrics | grep 'route="health/"' | head -3
+   curl -s http://127.0.0.1:8000/metrics | grep 'route="health/"' | head -3
+   ```
+
+   The second scrape must be **equal or higher**, never lower. Numbers that jump up
+   and down mean the workers are not aggregated.
+
+4. The business gauges include the Celery worker's work. Create a reservation, wait
+   for it to expire (with `RESERVATION_TTL_MINUTES=1`), and watch
+   `reservations_by_status{status="pending"}` fall while `...{status="expired"}`
+   rises, even though the worker, not the web server, did the expiring.
+
+5. Restart the web container and check the counters start again from zero:
+
+   ```bash
+   docker compose restart app
+   curl -s http://127.0.0.1:8000/metrics | grep 'route="health/"'
+   ```
+
+6. To test the token, add `METRICS_TOKEN=s3cret` to your `.env`, run
+   `docker compose --profile app up -d`, and check that
+   `curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8000/metrics` gives `401`,
+   and that `-H "Authorization: Bearer s3cret"` gives `200`. Remove it afterwards.
+
 ## Afterwards
 
 Remove `RESERVATION_TTL_MINUTES=1` from `.env` (the default is 15 minutes) and stop

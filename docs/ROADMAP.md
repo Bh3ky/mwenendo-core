@@ -73,7 +73,7 @@
 - Milestone 8 - Production readiness and going live
     - [ ]  Choose the deployment target (with an ADR).
     - [x]  Dockerise the application.
-    - [ ]  Configure structured logging and monitoring, including a `/metrics` endpoint.
+    - [x]  Configure structured logging and monitoring, including a `/metrics` endpoint.
     - [ ]  Add database connection management.
     - [ ]  Document architecture and deployment.
     - [ ]  Produce performance benchmarks.
