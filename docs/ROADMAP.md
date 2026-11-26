@@ -24,7 +24,7 @@
     > *Outcome:* A database that rejects invalid inventory states.
     >
 - Milestone 3 - Reservation API
-    - [ ]  Introduce Django Ninja.
+    - [x]  Introduce Django Ninja.
     - [ ]  Create Pydantic request and response schemas.
     - [ ]  Implement reservation creation and retrieval.
     - [ ]  Introduce HTTP status codes and API error handling.
