@@ -74,7 +74,7 @@
     - [ ]  Choose the deployment target (with an ADR).
     - [x]  Dockerise the application.
     - [x]  Configure structured logging and monitoring, including a `/metrics` endpoint.
-    - [ ]  Add database connection management.
+    - [x]  Add database connection management.
     - [ ]  Document architecture and deployment.
     - [ ]  Produce performance benchmarks.
     - [ ]  Deploy the application live.

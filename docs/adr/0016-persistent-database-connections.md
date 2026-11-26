@@ -46,13 +46,13 @@ Each additional app container adds another 4, so the limit is reached at roughly
 ## Consequences
 
 - **Good:**
-  - Requests no longer pay for connection setup.
+  - Requests should no longer pay for connection setup. This is the expected effect, and it has not been measured yet (see the last trade-off below).
   - A connection that died (a database restart, a network blip) is replaced before it fails a request.
   - The connection count is known and small.
 - **Bad / trade-offs:**
   - Idle workers hold connections, which matters only near the limit.
   - A long `CONN_MAX_AGE` delays picking up a database-side change such as a failover. 60 seconds is a compromise.
-  - The effect on speed is measured, not assumed, and the measurement is one machine with the load generator on it. See `docs/BENCHMARKS.md`.
+  - **The effect on speed has not been measured yet.** `loadtests/run_all.sh` compares persistent connections (`DB_CONN_MAX_AGE=60`) with a new connection per request (`0`) under gunicorn. Until its results are in `docs/BENCHMARKS.md`, this decision rests on how connections work, not on a measurement. If the numbers show no benefit, this ADR should be revisited. Any measurement will also be from one machine with the load generator on it.
 - **Revisit when:**
   - The number of app containers approaches the connection limit (an external pooler).
   - We move to threaded or async serving (a psycopg pool, with `CONN_MAX_AGE` back at 0).
