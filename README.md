@@ -100,9 +100,9 @@ PostgreSQL will remain the authoritative source of inventory state.
 - [x] Initial application and URL configuration
 - [x] Basic landing page
 - [x] Health-check endpoint
-- [ ] Environment configuration, PostgreSQL, testing and CI
-- [ ] Database modelling and inventory management
-- [ ] Reservation API
+- [x] Environment configuration, PostgreSQL, testing and CI
+- [x] Database modelling and inventory management
+- [x] Reservation API
 - [ ] Transaction management and row-level locking
 - [ ] Reservation state machine and idempotency
 - [ ] Celery and Redis integration
