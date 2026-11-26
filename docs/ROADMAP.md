@@ -56,8 +56,8 @@
     >
 - Milestone 6 - Background processing
     - [ ]  Configure Celery and Redis.
-    - [ ]  Implement reservation expiry.
-    - [ ]  Add a periodic expiry sweep as a safety net alongside per-reservation tasks.
+    - [x]  Implement reservation expiry.
+    - [x]  Add a periodic expiry sweep as a safety net alongside per-reservation tasks.
     - [ ]  Handle retries and task failures.
     - [ ]  Introduce transaction commit hooks (`transaction.on_commit`) and, optionally, an outbox pattern (with an ADR).
 
