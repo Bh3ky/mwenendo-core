@@ -1,23 +1,70 @@
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from inventory.models import Inventory
 from inventory.services import allocate_stock, release_stock
 from reservations.models import Reservation
 
 
-def reserve_stock(inventory: Inventory, quantity: int, reference: str) -> Reservation:
+class IdempotencyKeyReused(Exception):
+    """The key was already used for a different request."""
+
+
+def _replay(
+    existing: Reservation, inventory: Inventory, quantity: int, reference: str
+) -> Reservation:
+    same_request = (existing.inventory_id, existing.quantity, existing.reference) == (
+        inventory.pk,
+        quantity,
+        reference,
+    )
+    if not same_request:
+        raise IdempotencyKeyReused(
+            "This idempotency key was already used for a different request."
+        )
+    return existing
+
+
+def reserve_stock(
+    inventory: Inventory,
+    quantity: int,
+    reference: str,
+    idempotency_key: str = "",
+) -> Reservation:
     """Hold `quantity` units and record who holds them, as one unit of work.
 
     The counter update and the reservation insert share a transaction, so
     either both happen or neither does.
+
+    With an idempotency key, repeating the same request returns the original
+    reservation instead of holding more stock. Reusing the key for a different
+    request raises IdempotencyKeyReused.
     """
-    with transaction.atomic():
-        allocate_stock(inventory, quantity)
-        return Reservation.objects.create(
-            inventory=inventory,
-            quantity=quantity,
-            reference=reference,
-        )
+    if idempotency_key:
+        existing = Reservation.objects.filter(idempotency_key=idempotency_key).first()
+        if existing is not None:
+            return _replay(existing, inventory, quantity, reference)
+
+    try:
+        with transaction.atomic():
+            allocate_stock(inventory, quantity)
+            return Reservation.objects.create(
+                inventory=inventory,
+                quantity=quantity,
+                reference=reference,
+                idempotency_key=idempotency_key,
+            )
+    except IntegrityError:
+        # Two requests with the same key can both miss the lookup above. The
+        # unique constraint lets only one insert win, and the loser's stock
+        # allocation was rolled back with its transaction. Return the winner's.
+        if idempotency_key:
+            existing = Reservation.objects.filter(
+                idempotency_key=idempotency_key
+            ).first()
+            if existing is not None:
+                inventory.refresh_from_db()
+                return _replay(existing, inventory, quantity, reference)
+        raise
 
 
 class InvalidTransition(Exception):

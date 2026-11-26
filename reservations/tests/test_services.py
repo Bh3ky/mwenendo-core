@@ -6,6 +6,7 @@ from inventory.services import InsufficientStock, StockError
 from inventory.tests.factories import InventoryFactory
 from reservations.models import Reservation
 from reservations.services import (
+    IdempotencyKeyReused,
     InvalidTransition,
     cancel_reservation,
     confirm_reservation,
@@ -144,3 +145,41 @@ def test_transition_of_a_deleted_reservation_raises_does_not_exist():
 
     with pytest.raises(Reservation.DoesNotExist):
         confirm_reservation(reservation)
+
+
+@pytest.mark.django_db
+def test_repeating_a_request_with_the_same_key_returns_the_original():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=0)
+
+    first = reserve_stock(inventory, 3, "order-1", idempotency_key="key-1")
+    second = reserve_stock(inventory, 3, "order-1", idempotency_key="key-1")
+
+    inventory.refresh_from_db()
+    assert second.pk == first.pk
+    assert Reservation.objects.count() == 1
+    assert inventory.allocated_quantity == 3
+
+
+@pytest.mark.django_db
+def test_reusing_a_key_for_a_different_request_is_rejected():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=0)
+    reserve_stock(inventory, 3, "order-1", idempotency_key="key-1")
+
+    with pytest.raises(IdempotencyKeyReused):
+        reserve_stock(inventory, 4, "order-1", idempotency_key="key-1")
+
+    inventory.refresh_from_db()
+    assert Reservation.objects.count() == 1
+    assert inventory.allocated_quantity == 3
+
+
+@pytest.mark.django_db
+def test_requests_without_a_key_are_not_deduplicated():
+    inventory = InventoryFactory(total_quantity=10, allocated_quantity=0)
+
+    reserve_stock(inventory, 1, "order-1")
+    reserve_stock(inventory, 1, "order-1")
+
+    inventory.refresh_from_db()
+    assert Reservation.objects.count() == 2
+    assert inventory.allocated_quantity == 2
