@@ -242,3 +242,19 @@ def test_gunicorn_does_nothing_about_metrics_when_the_directory_is_not_set(
     gunicorn_conf.child_exit(server=None, worker=SimpleNamespace(pid=1))
 
     assert dead == []
+
+
+def test_gunicorn_uses_shared_memory_for_its_heartbeat_only_where_it_exists(
+    monkeypatch,
+):
+    path = Path(__file__).resolve().parents[2] / "gunicorn.conf.py"
+
+    def load(shm_exists):
+        monkeypatch.setattr("os.path.isdir", lambda p: shm_exists and p == "/dev/shm")
+        spec = importlib.util.spec_from_file_location("gunicorn_conf_shm", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    assert load(shm_exists=True).worker_tmp_dir == "/dev/shm"
+    assert load(shm_exists=False).worker_tmp_dir is None  # macOS
