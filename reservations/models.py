@@ -11,6 +11,7 @@ class Reservation(models.Model):
         PENDING = "pending", "Pending"
         CONFIRMED = "confirmed", "Confirmed"
         CANCELLED = "cancelled", "Cancelled"
+        EXPIRED = "expired", "Expired"
 
     # The integer primary key stays internal; clients only ever see public_id.
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -29,6 +30,9 @@ class Reservation(models.Model):
     # Empty means the client sent no key. Real keys must be unique.
     idempotency_key = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
+    # When a pending reservation stops holding stock. Null means it never
+    # expires, which is how reservations made before expiry existed behave.
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         constraints = [
