@@ -16,8 +16,11 @@ class InventoryOut(Schema):
     available_quantity: int
 
 
+MAX_QUANTITY = 1_000_000
+
+
 class StockChangeIn(Schema):
-    quantity: int = Field(gt=0, strict=True)
+    quantity: int = Field(gt=0, le=MAX_QUANTITY, strict=True)
 
 
 def _get_inventory_or_404(sku: str) -> Inventory:
