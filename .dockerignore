@@ -1,0 +1,23 @@
+# Secrets and local state never go into an image
+.env
+.env.*
+!.env.example
+db.sqlite3
+celerybeat-schedule*
+
+# Not needed to run the app
+.git
+.github
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+staticfiles
+docs
+*.md
+loadtests
+**/tests
+conftest.py
+Dockerfile
+docker-compose.yml
