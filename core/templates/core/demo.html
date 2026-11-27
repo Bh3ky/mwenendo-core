@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mwenendo Core demo</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --text: #1d1d1b; --muted: #66665f;
+    --line: #dcdcd6; --accent: #1f6feb; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14150f; --surface: #1c1d17; --text: #ececE6; --muted: #a2a299;
+      --line: #34352c; --accent: #5aa2ff; --ok: #3fb950; --warn: #d29922; --bad: #ff7b72;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 64rem; margin: 0 auto; padding: 1rem 16px 3rem; }
+  h1 { font-size: 1.5rem; margin: 1rem 0 0.25rem; }
+  h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+  p.lead { color: var(--muted); margin: 0 0 1rem; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+  @media (min-width: 52rem) { .grid { grid-template-columns: 1fr 1fr; } }
+  section { background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 1rem; }
+  .wide { grid-column: 1 / -1; }
+  label { display: block; font-size: 0.85rem; color: var(--muted); margin: 0.5rem 0 0.2rem; }
+  input[type=text], input[type=number] { width: 100%; padding: 0.45rem 0.6rem; font: inherit;
+    color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  .row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end; margin-top: 0.5rem; }
+  .row > * { flex: 1 1 8rem; }
+  button { font: inherit; padding: 0.45rem 0.8rem; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; }
+  .stats { display: flex; gap: 1.5rem; margin: 0.5rem 0; flex-wrap: wrap; }
+  .stat b { display: block; font-size: 1.4rem; }
+  .stat span { color: var(--muted); font-size: 0.85rem; }
+  meter { width: 100%; height: 0.9rem; }
+  .note { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li.card { border: 1px solid var(--line); border-radius: 6px; padding: 0.6rem 0.75rem; margin-top: 0.5rem; }
+  .pill { display: inline-block; padding: 0 0.5rem; border-radius: 999px; font-size: 0.8rem;
+    border: 1px solid var(--line); }
+  .pill.pending { color: var(--warn); } .pill.confirmed { color: var(--ok); }
+  .pill.cancelled, .pill.expired { color: var(--muted); }
+  .s2 { color: var(--ok); } .s4 { color: var(--warn); } .s5 { color: var(--bad); }
+  .log li { border-top: 1px solid var(--line); padding: 0.35rem 0; font-size: 0.85rem; }
+  .log summary { cursor: pointer; }
+  .log pre { margin: 0.4rem 0 0; padding: 0.5rem; background: var(--bg); border-radius: 6px;
+    overflow-x: auto; font-size: 0.8rem; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #message { min-height: 1.4rem; margin: 0.5rem 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mwenendo Core: reservation playground</h1>
+  <p class="lead">Talk to the live API from your browser. Every request and response is
+    shown at the bottom, so you can see what the system does. API docs are at
+    <a href="/api/docs">/api/docs</a>.</p>
+
+  <div class="grid">
+    <section aria-labelledby="h-stock">
+      <h2 id="h-stock">1. Stock</h2>
+      <label for="sku">Product SKU</label>
+      <div class="row">
+        <input id="sku" type="text" value="DEMO-1" autocomplete="off" spellcheck="false">
+        <button id="refresh" class="primary" type="button">Load</button>
+      </div>
+      <div class="stats" aria-live="polite">
+        <div class="stat"><b id="total">-</b><span>total</span></div>
+        <div class="stat"><b id="allocated">-</b><span>allocated</span></div>
+        <div class="stat"><b id="available">-</b><span>available</span></div>
+      </div>
+      <meter id="meter" min="0" max="1" value="0" aria-label="Share of stock allocated"></meter>
+      <div class="row">
+        <button id="add" type="button">Add 10 units</button>
+        <button id="remove" type="button">Remove 10 units</button>
+      </div>
+      <p class="note">The product must already exist. Create a Product and an Inventory
+        for it in the <a href="/admin/">admin</a> if you get a 404.</p>
+    </section>
+
+    <section aria-labelledby="h-reserve">
+      <h2 id="h-reserve">2. Reserve</h2>
+      <div class="row">
+        <div><label for="quantity">Quantity</label>
+          <input id="quantity" type="number" min="1" value="1"></div>
+        <div><label for="reference">Reference (who it is for)</label>
+          <input id="reference" type="text" value="demo-visitor" maxlength="255"></div>
+      </div>
+      <label><input id="reuseKey" type="checkbox"> Reuse the last Idempotency-Key
+        (a retry: you get the same reservation back, and the stock is held once)</label>
+      <div class="row">
+        <button id="reserve" class="primary" type="button">Reserve</button>
+      </div>
+      <p id="message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="wide" aria-labelledby="h-stampede">
+      <h2 id="h-stampede">3. Stampede</h2>
+      <p class="note" style="margin-top:0">Send many reservations for one unit each, all at the
+        same moment. However many you send, the number of 201 answers can never exceed the
+        stock that was available, and the rest are refused with 409.</p>
+      <div class="row">
+        <div><label for="count">Requests</label>
+          <input id="count" type="number" min="1" max="100" value="20"></div>
+        <button id="stampede" type="button">Send them all at once</button>
+      </div>
+      <p id="stampedeResult" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="wide" aria-labelledby="h-list">
+      <h2 id="h-list">Your reservations</h2>
+      <p class="note" style="margin-top:0">Reservations expire after the deadline if they are
+        not confirmed, and their stock is released.</p>
+      <ul id="reservations"></ul>
+    </section>
+
+    <section class="wide" aria-labelledby="h-log">
+      <h2 id="h-log">Request log</h2>
+      <ul id="log" class="log"></ul>
+    </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const reservations = new Map();   // id -> reservation, kept in this page only
+let lastKey = null;
+
+function newKey() {
+  return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+}
+
+function sku() {
+  return encodeURIComponent($("sku").value.trim());
+}
+
+// ---- talking to the API ----------------------------------------------------
+
+async function api(method, path, body, extraHeaders, quiet) {
+  const started = performance.now();
+  const options = { method: method, headers: Object.assign({}, extraHeaders) };
+  if (body !== undefined) {
+    options.headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+  let response;
+  try {
+    response = await fetch(path, options);
+  } catch (error) {
+    if (!quiet) { log(method, path, 0, 0, null, String(error)); }
+    return { status: 0, data: { detail: String(error) } };
+  }
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch (error) { data = text; }
+  if (!quiet) {
+    log(method, path, response.status, Math.round(performance.now() - started),
+        response.headers.get("X-Request-ID"), data);
+  }
+  return { status: response.status, data: data };
+}
+
+function detailOf(data) {
+  if (data && typeof data === "object" && data.detail) {
+    return typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail);
+  }
+  return typeof data === "string" ? data.slice(0, 120) : "unexpected response";
+}
+
+// ---- the request log (text only: nothing from the server is parsed as HTML) --
+
+function log(method, path, status, ms, requestId, data) {
+  const item = document.createElement("li");
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  const code = document.createElement("span");
+  code.className = "mono s" + String(status).charAt(0);
+  code.textContent = status === 0 ? "ERR" : String(status);
+  summary.append(code, " ", method + " " + path + "  (" + ms + " ms)");
+  const pre = document.createElement("pre");
+  pre.textContent = (requestId ? "X-Request-ID: " + requestId + "\n" : "") +
+    (typeof data === "string" ? data : JSON.stringify(data, null, 2));
+  details.append(summary, pre);
+  item.append(details);
+  const list = $("log");
+  list.prepend(item);
+  while (list.children.length > 40) { list.lastElementChild.remove(); }
+}
+
+// ---- stock -----------------------------------------------------------------
+
+function showStock(data) {
+  $("total").textContent = data.total_quantity;
+  $("allocated").textContent = data.allocated_quantity;
+  $("available").textContent = data.available_quantity;
+  $("meter").max = Math.max(data.total_quantity, 1);
+  $("meter").value = data.allocated_quantity;
+}
+
+function clearStock() {
+  ["total", "allocated", "available"].forEach((id) => { $(id).textContent = "-"; });
+  $("meter").value = 0;
+}
+
+async function loadStock(quiet) {
+  const result = await api("GET", "/api/products/" + sku() + "/inventory",
+                           undefined, undefined, quiet === true);
+  if (result.status === 200) { showStock(result.data); } else { clearStock(); }
+  return result;
+}
+
+async function changeStock(action) {
+  const result = await api("POST", "/api/products/" + sku() + "/inventory/" + action,
+                           { quantity: 10 });
+  if (result.status === 200) { showStock(result.data); }
+  else { setMessage(detailOf(result.data)); }
+}
+
+// ---- reservations ----------------------------------------------------------
+
+function setMessage(text) { $("message").textContent = text; }
+
+async function reserve(quantity, reference, key) {
+  return api("POST", "/api/products/" + sku() + "/reservations",
+             { quantity: quantity, reference: reference }, { "Idempotency-Key": key });
+}
+
+async function onReserve() {
+  const quantity = Number($("quantity").value);
+  const reference = $("reference").value;
+  const reuse = $("reuseKey").checked && lastKey;
+  const key = reuse ? lastKey : newKey();
+  lastKey = key;
+  const result = await reserve(quantity, reference, key);
+  if (result.status === 201) {
+    reservations.set(result.data.id, result.data);
+    setMessage(reuse ? "Same key: you got the same reservation back, and the stock was held once."
+                     : "Reserved.");
+  } else if (result.status === 409) {
+    setMessage("Refused (409): " + detailOf(result.data));
+  } else {
+    setMessage("Not reserved (" + result.status + "): " + detailOf(result.data));
+  }
+  renderReservations();
+  await loadStock();
+}
+
+async function onAction(id, action) {
+  const result = await api("POST", "/api/reservations/" + id + "/" + action);
+  if (result.status === 200) { reservations.set(id, result.data); setMessage(""); }
+  else { setMessage(action + " refused (" + result.status + "): " + detailOf(result.data)); }
+  renderReservations();
+  await loadStock();
+}
+
+async function refreshReservation(id) {
+  const result = await api("GET", "/api/reservations/" + id, undefined, undefined, true);
+  if (result.status === 200) { reservations.set(id, result.data); }
+}
+
+function remaining(reservation) {
+  if (!reservation.expires_at) { return null; }
+  return Math.round((new Date(reservation.expires_at) - new Date()) / 1000);
+}
+
+function describeRemaining(reservation) {
+  if (reservation.status !== "pending") { return ""; }
+  const seconds = remaining(reservation);
+  if (seconds === null) { return "no deadline"; }
+  if (seconds <= 0) { return "overdue, expiring any moment"; }
+  const minutes = Math.floor(seconds / 60);
+  return "expires in " + minutes + "m " + String(seconds % 60).padStart(2, "0") + "s";
+}
+
+function renderReservations() {
+  const list = $("reservations");
+  list.replaceChildren();
+  if (reservations.size === 0) {
+    const empty = document.createElement("li");
+    empty.className = "note";
+    empty.textContent = "None yet. Reserve something above.";
+    list.append(empty);
+    return;
+  }
+  Array.from(reservations.values()).reverse().forEach((reservation) => {
+    const item = document.createElement("li");
+    item.className = "card";
+    item.dataset.id = reservation.id;
+
+    const title = document.createElement("div");
+    const pill = document.createElement("span");
+    pill.className = "pill " + reservation.status;
+    pill.textContent = reservation.status;
+    const text = document.createElement("span");
+    text.textContent = " " + reservation.quantity + " x " + reservation.sku + " for " +
+                       reservation.reference;
+    title.append(pill, text);
+
+    const meta = document.createElement("div");
+    meta.className = "note mono";
+    const countdown = document.createElement("span");
+    countdown.className = "countdown";
+    countdown.textContent = describeRemaining(reservation);
+    meta.append(reservation.id.slice(0, 8) + "  ", countdown);
+
+    item.append(title, meta);
+    if (reservation.status === "pending" || reservation.status === "confirmed") {
+      const row = document.createElement("div");
+      row.className = "row";
+      if (reservation.status === "pending") {
+        const confirm = document.createElement("button");
+        confirm.type = "button";
+        confirm.textContent = "Confirm";
+        confirm.addEventListener("click", () => onAction(reservation.id, "confirm"));
+        row.append(confirm);
+      }
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => onAction(reservation.id, "cancel"));
+      row.append(cancel);
+      item.append(row);
+    }
+    list.append(item);
+  });
+}
+
+// ---- the stampede ----------------------------------------------------------
+
+async function onStampede() {
+  const count = Math.min(Math.max(Number($("count").value) || 1, 1), 100);
+  const before = await loadStock();
+  if (before.status !== 200) {
+    $("stampedeResult").textContent = "Load a product that exists first.";
+    return;
+  }
+  const available = before.data.available_quantity;
+  $("stampede").disabled = true;
+  $("stampedeResult").textContent = "Sending " + count + " requests at once...";
+
+  const results = await Promise.all(
+    Array.from({ length: count }, () => reserve(1, "stampede", newKey())));
+
+  const tally = {};
+  results.forEach((result) => {
+    tally[result.status] = (tally[result.status] || 0) + 1;
+    if (result.status === 201) { reservations.set(result.data.id, result.data); }
+  });
+  const accepted = tally[201] || 0;
+  const parts = Object.keys(tally).sort().map((status) => status + ": " + tally[status]);
+  $("stampedeResult").textContent =
+    "Sent " + count + " with " + available + " available. Answers: " + parts.join(", ") + ". " +
+    (accepted <= available ? "Never more accepted than available." : "MORE ACCEPTED THAN AVAILABLE.");
+  $("stampede").disabled = false;
+  renderReservations();
+  await loadStock();
+}
+
+// ---- start up --------------------------------------------------------------
+
+$("refresh").addEventListener("click", () => loadStock());
+$("sku").addEventListener("keydown", (event) => { if (event.key === "Enter") { loadStock(); } });
+$("add").addEventListener("click", () => changeStock("add"));
+$("remove").addEventListener("click", () => changeStock("remove"));
+$("reserve").addEventListener("click", onReserve);
+$("stampede").addEventListener("click", onStampede);
+
+// Tick the countdowns every second, and ask the server about pending reservations
+// every 5 seconds, so an expiry done by the background worker shows up here.
+setInterval(() => {
+  document.querySelectorAll("li.card").forEach((item) => {
+    const reservation = reservations.get(item.dataset.id);
+    const countdown = item.querySelector(".countdown");
+    if (reservation && countdown) { countdown.textContent = describeRemaining(reservation); }
+  });
+}, 1000);
+
+setInterval(async () => {
+  const pending = Array.from(reservations.values()).filter((r) => r.status === "pending");
+  if (pending.length === 0) { return; }
+  await Promise.all(pending.map((r) => refreshReservation(r.id)));
+  renderReservations();
+  loadStock(true);
+}, 5000);
+
+renderReservations();
+loadStock();
+</script>
+</body>
+</html>

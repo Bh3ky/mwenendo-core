@@ -258,3 +258,18 @@ def test_gunicorn_uses_shared_memory_for_its_heartbeat_only_where_it_exists(
 
     assert load(shm_exists=True).worker_tmp_dir == "/dev/shm"
     assert load(shm_exists=False).worker_tmp_dir is None  # macOS
+
+
+@pytest.mark.django_db
+def test_registering_the_database_collector_runs_no_queries(
+    django_assert_num_queries,
+):
+    from prometheus_client import CollectorRegistry
+
+    from config.metrics import DatabaseCollector
+
+    # collect() is what queries. Registering must not call it, or every process
+    # would hit the database at import time (and during `migrate`).
+    with django_assert_num_queries(0):
+        # The default REGISTRY, the one we use, is made with auto_describe=True.
+        CollectorRegistry(auto_describe=True).register(DatabaseCollector())

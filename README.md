@@ -171,6 +171,7 @@ The application will be available at:
 
 - Landing page: `http://127.0.0.1:8000/`
 - Health check: `http://127.0.0.1:8000/health/`
+- Demo page (look up stock, reserve, confirm, cancel, retry with an idempotency key, and fire a stampede of simultaneous reservations): `http://127.0.0.1:8000/demo/`
 
 ### Running the whole system in containers
 

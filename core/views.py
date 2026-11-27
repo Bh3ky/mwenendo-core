@@ -18,6 +18,11 @@ def home(request):
     return render(request, "core/home.html", context)
 
 
+def demo(request):
+    """A one-file page that exercises the API from the browser."""
+    return render(request, "core/demo.html")
+
+
 def health_check(request):
     return JsonResponse({"status": "healthy"})
 
