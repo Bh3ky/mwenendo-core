@@ -76,7 +76,7 @@
     - [x]  Configure structured logging and monitoring, including a `/metrics` endpoint.
     - [x]  Add database connection management.
     - [x]  Document architecture and deployment.
-    - [ ]  Produce performance benchmarks.
+    - [x]  Produce performance benchmarks.
     - [ ]  Deploy the application live.
 
     > *Outcome:* A live, demonstrable backend engineering portfolio project.

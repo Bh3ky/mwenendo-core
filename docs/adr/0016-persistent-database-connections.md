@@ -46,13 +46,14 @@ Each additional app container adds another 4, so the limit is reached at roughly
 ## Consequences
 
 - **Good:**
-  - Requests should no longer pay for connection setup. This is the expected effect, and it has not been measured yet (see the last trade-off below).
+  - Requests no longer pay for connection setup. Measured under gunicorn on one laptop, two runs per setting: about 350 requests per second with connections kept open, against about 200 with a new connection per request, and a median reserve time of about 14 ms against about 115 ms (see `docs/BENCHMARKS.md`).
+  - With a new connection per request, the same runs produced 17% to 43% failed requests in two scenarios (TCP-level connection errors). With connections kept open there were none. The cause of those errors is not established (the likeliest suspect is Docker Desktop's port forwarding on a Mac), so the failures are evidence for this choice here, not a general rule.
   - A connection that died (a database restart, a network blip) is replaced before it fails a request.
   - The connection count is known and small.
 - **Bad / trade-offs:**
   - Idle workers hold connections, which matters only near the limit.
   - A long `CONN_MAX_AGE` delays picking up a database-side change such as a failover. 60 seconds is a compromise.
-  - **The effect on speed has not been measured yet.** `loadtests/run_all.sh` compares persistent connections (`DB_CONN_MAX_AGE=60`) with a new connection per request (`0`) under gunicorn. Until its results are in `docs/BENCHMARKS.md`, this decision rests on how connections work, not on a measurement. If the numbers show no benefit, this ADR should be revisited. Any measurement will also be from one machine with the load generator on it.
+  - **The measurement is from one machine** with the load generator, the server and a Docker Desktop network layer all on it, and two runs per setting. It shows the direction clearly. It does not give a number to quote for a Linux server.
 - **Revisit when:**
   - The number of app containers approaches the connection limit (an external pooler).
   - We move to threaded or async serving (a psycopg pool, with `CONN_MAX_AGE` back at 0).
