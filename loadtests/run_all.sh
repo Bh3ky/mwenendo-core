@@ -17,6 +17,11 @@ if [[ "$POSTGRES_DB" != *bench* ]]; then
 fi
 
 LABEL="${LABEL:?Set LABEL, for example LABEL=conn60}"
+# The label becomes part of every product's SKU and of file names, so keep it plain.
+if [[ ! "$LABEL" =~ ^[A-Za-z0-9]+$ ]]; then
+  echo "Refusing to run: LABEL '$LABEL' must be letters and digits only (no spaces)." >&2
+  exit 1
+fi
 DURATION="${DURATION:-30s}"
 USERS="${USERS:-50}"
 PORT="${PORT:-8001}"
@@ -24,6 +29,12 @@ export DB_CONN_MAX_AGE="${DB_CONN_MAX_AGE:-60}"
 export DEBUG=False ALLOWED_HOSTS=127.0.0.1,localhost
 
 mkdir -p loadtests/results
+
+# The benchmark database is separate from the development one, so nothing migrates
+# it for you. A stale schema makes every request fail with a 500, which looks fast
+# and wrong. This only ever touches the database whose name contains 'bench'.
+echo "Applying migrations to $POSTGRES_DB..."
+uv run python manage.py migrate --noinput | tail -1
 
 echo "Seeding products for '$LABEL' in $POSTGRES_DB..."
 uv run python manage.py seed_benchmark --prefix "${LABEL}HOT" --count 1 --stock 1000000
@@ -51,7 +62,9 @@ run() {  # run <scenario> <prefix> <sku count>
   SKU_PREFIX="$2" SKU_COUNT="$3" uv run locust -f loadtests/locustfile.py --headless \
     --host "http://127.0.0.1:$PORT" -u "$USERS" -r 25 -t "$DURATION" \
     --csv "loadtests/results/$LABEL-$1" --only-summary \
-    > "loadtests/results/$LABEL-$1.txt" 2>&1
+    > "loadtests/results/$LABEL-$1.txt" 2>&1 || true
+  # Locust exits non-zero when any request failed. Do not stop here: the failures
+  # are counted in the summary, and the checks below decide whether the run is valid.
 }
 
 run hot "${LABEL}HOT" 1
@@ -61,8 +74,18 @@ run sellout "${LABEL}SELL" 1
 echo "Checking correctness..."
 uv run python manage.py reconcile_stock
 
+# A run in which the server returned 5xx errors is not a valid measurement: errors
+# are quick, so they make the numbers look better than they are.
+SERVER_ERRORS=$(grep -c '"status": 5' "loadtests/results/$LABEL-gunicorn.log" || true)
+echo "Server errors (5xx) in the gunicorn log: $SERVER_ERRORS"
+
 echo
 uv run python loadtests/summarise.py \
   "loadtests/results/$LABEL-hot" \
   "loadtests/results/$LABEL-spread" \
   "loadtests/results/$LABEL-sellout"
+
+if [[ "$SERVER_ERRORS" -gt 0 ]]; then
+  echo "INVALID RUN: the server returned $SERVER_ERRORS errors, so these numbers cannot be used." >&2
+  exit 1
+fi
