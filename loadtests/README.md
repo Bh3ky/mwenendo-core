@@ -51,6 +51,11 @@ LABEL=conn60 DB_CONN_MAX_AGE=60 loadtests/run_all.sh   # persistent connections
 LABEL=conn0  DB_CONN_MAX_AGE=0  loadtests/run_all.sh   # a new connection per request
 ```
 
+To run the whole comparison (60, 0, 60, 0, about 15 minutes) use `PREFIX=g loadtests/compare.sh`. A run is
+reported invalid, and its numbers must not be used, if the server returned any 5xx or the books
+did not reconcile. The script migrates the benchmark database itself, and rejects labels that are
+not plain letters and digits.
+
 It refuses to run unless `POSTGRES_DB` contains `bench` (the default is
 `mwenendo_bench`). Output and CSV files go to `loadtests/results/`, which git ignores.
 To put earlier runs side by side:

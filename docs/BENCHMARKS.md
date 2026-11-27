@@ -81,13 +81,70 @@ Speed does not count if the data is wrong, so every run was followed by
    or dropped connections. The server log shows no application errors. This looks
    like the development server shedding load, but I did not confirm the cause.
 
+## Behind gunicorn, and what reusing database connections is worth
+
+The first set of runs above used Django's development server. These were run later
+against **gunicorn with 4 worker processes** (`DEBUG=False`), on the same laptop and the
+same three scenarios, 50 users, 30 seconds each. The only thing that differs between the
+two settings is Django's `CONN_MAX_AGE`: **60** keeps each worker's database connection
+open between requests, and **0** opens a new connection for every request (ADR-0016). The
+settings alternated (60, 0, 60, 0), and each setting was run twice. `reconcile_stock`
+passed after every run, so no stock was lost or oversold in any of them.
+
+Response times in milliseconds. "Failed" is the share of requests that got a 500.
+
+| Scenario | Connections | Run | Requests/s | Failed | Reserve p50 | p95 | p99 |
+|---|---|---|---|---|---|---|---|
+| Hot row | kept open | 1 | 342 | 0% | 15 | 60 | 220 |
+| Hot row | kept open | 2 | 358 | 0% | 14 | 34 | 72 |
+| Hot row | new each request | 1 | 197 | 0% | 120 | 200 | 240 |
+| Hot row | new each request | 2 | 210 | 0% | 110 | 190 | 320 |
+| Spread | kept open | 1 | 352 | 0% | 12 | 47 | 140 |
+| Spread | kept open | 2 | 363 | 0% | 12 | 27 | 61 |
+| Spread | new each request | 1 | 202 | **21%** | 120 | 270 | 560 |
+| Spread | new each request | 2 | 257 | **43%** | 77 | 160 | 230 |
+| Sell-out | kept open | 1 | 360 | 0% | 12 | 35 | 74 |
+| Sell-out | kept open | 2 | 352 | 0% | 12 | 40 | 130 |
+| Sell-out | new each request | 1 | 209 | **17%** | 110 | 200 | 470 |
+| Sell-out | new each request | 2 | 227 | **18%** | 92 | 140 | 360 |
+
+Server errors (5xx) over a whole run, from the server's own log: **0 and 0** with
+connections kept open (about 31,000 and 32,000 requests), against **2,544 and 4,713**
+with a new connection per request (about 18,000 and 21,000 requests).
+
+What this shows:
+
+1. **Keeping connections open was clearly better here, and the result repeated.** In the
+   hot-row scenario, where nothing failed in either setting, throughput was 342 and 358
+   requests per second against 197 and 210, and the median reserve time was about
+   14 ms against about 115 ms. Both pairs agree within about 5%, so the gap of roughly
+   70% is far outside the run-to-run variation I could see.
+2. **A new connection per request also produced errors under load,** in the spread and
+   sell-out scenarios (17% to 43% of requests failed). The errors were TCP-level:
+   "connection refused" and "server closed the connection unexpectedly". PostgreSQL's own
+   log showed no matching error and it never came near its limit of 100 connections.
+3. **I do not know why the errors happen, and I am not claiming to.** My guess is that on
+   a Mac, "localhost" reaches the database through Docker Desktop's port forwarding, which
+   may not cope with a few hundred brand-new connections per second. I did not test that.
+   A Linux server connects without that layer, so the errors may not appear there, though
+   the cost of opening a connection would still apply.
+4. **Compared with the development-server runs above,** the hot row went from 234 to
+   about 350 requests per second and the reserve p95 from 350 ms to between 34 and 60 ms.
+   That compares two changes at once (a real server, and reused connections), because the
+   development-server runs also opened a connection per request, so I cannot say how much
+   each contributed.
+5. **Correctness did not depend on any of this.** Every run, including the failing ones,
+   ended with the ledger agreeing with the counters.
+
 ## Limits of these numbers
 
-- **One 30-second run per scenario.** There is no repeat, so no measure of
-  run-to-run variation. Treat differences of a few percent as noise.
-- **A single-process development server**, not a production server. These
-  figures are a floor, not what the application can do behind gunicorn or
-  similar.
+- **One 30-second run per scenario in the first set** (development server), so no
+  measure of variation there. The gunicorn comparison was run twice per setting, which
+  shows the direction repeats but is still a small sample.
+- **The first set used a single-process development server**, so those figures are a
+  floor. The gunicorn set is closer to a real server, but it is still one laptop.
+- **Docker Desktop's network layer is in the path** to PostgreSQL on a Mac. It may be
+  the cause of the connection errors above, and it would not exist on a Linux server.
 - **Load generator, server and database share one machine**, so they compete
   for the same CPU.
 - **The cost of the ledger was not measured.** It would need the same run
