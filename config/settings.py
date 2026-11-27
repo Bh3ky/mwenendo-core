@@ -188,3 +188,17 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # /metrics: if a token is set, scrapers must send "Authorization: Bearer <token>".
 # Empty means open, which is fine locally. Also restrict it at the proxy in production.
 METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
+# Behind a proxy that terminates TLS (Caddy, in docker-compose.prod.yml).
+# Off by default, so local development over plain HTTP keeps working (ADR-0017).
+BEHIND_TLS_PROXY = env.bool("BEHIND_TLS_PROXY", default=False)
+# Origins allowed to send cookie-authenticated POSTs, such as the admin login,
+# for example https://example.duckdns.org
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+if BEHIND_TLS_PROXY:
+    # The proxy talks to us over plain HTTP, so trust its header to know the
+    # original request was HTTPS.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    # Never send the session or CSRF cookie over plain HTTP.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True

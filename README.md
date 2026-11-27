@@ -190,6 +190,12 @@ Prometheus metrics are at `/metrics`: request counts and latency by route, refus
 
 The containers read `.env`, but override what must differ inside Docker: the database host, the Redis URL and `DEBUG=False`. Secrets are never copied into the image.
 
+### More documentation
+
+- [Architecture](docs/ARCHITECTURE.md): how the system fits together, what it guarantees and where each guarantee comes from, and its known gaps.
+- [Deployment](docs/DEPLOYMENT.md): putting it on a single server behind HTTPS, restarting it after a pause, and backups. Not yet run on a real server.
+- [Benchmarks](docs/BENCHMARKS.md) and the [decision records](docs/adr/).
+
 ## Testing
 
 Run the tests and linters (PostgreSQL must be running):
