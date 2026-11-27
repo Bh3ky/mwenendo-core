@@ -34,6 +34,12 @@ class DatabaseCollector:
     the work of every process, and it survives restarts.
     """
 
+    def describe(self):
+        # Without this, the registry calls collect() when the collector is
+        # registered, to learn its metric names. That would query the database at
+        # import time, in every process, including during `migrate`.
+        return []
+
     def collect(self):
         try:
             by_status = dict(
