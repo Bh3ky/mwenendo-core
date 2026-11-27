@@ -273,3 +273,37 @@ def test_registering_the_database_collector_runs_no_queries(
     with django_assert_num_queries(0):
         # The default REGISTRY, the one we use, is made with auto_describe=True.
         CollectorRegistry(auto_describe=True).register(DatabaseCollector())
+
+
+def test_the_multiprocess_variable_is_set_for_gunicorn_only():
+    # If the compose services set it, every command run in the app container
+    # (manage.py, a shell, `exec`) would inherit it. The directory only exists once
+    # gunicorn has started, so those commands would crash, or pollute its files.
+    root = Path(__file__).resolve().parents[2]
+
+    assert "PROMETHEUS_MULTIPROC_DIR" not in (root / "docker-compose.yml").read_text()
+    assert (
+        "PROMETHEUS_MULTIPROC_DIR" not in (root / "docker-compose.prod.yml").read_text()
+    )
+
+    cmd = (root / "Dockerfile").read_text().split("CMD", 1)[1]
+    assert "PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus-multiproc" in cmd
+    assert "gunicorn" in cmd
+
+
+def test_importing_the_metrics_without_the_variable_needs_no_directory():
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "PROMETHEUS_MULTIPROC_DIR"}
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings"
+
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup(); import core.metrics"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr

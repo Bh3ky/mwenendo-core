@@ -44,4 +44,9 @@ RUN SECRET_KEY=build-only POSTGRES_DB=build POSTGRES_USER=build \
 
 EXPOSE 8000
 
-CMD ["gunicorn", "-c", "gunicorn.conf.py", "config.wsgi:application"]
+# PROMETHEUS_MULTIPROC_DIR is set for the gunicorn process only, not for the whole
+# container. Any other command run in this image (manage.py, a shell) must not
+# inherit it: it would try to write metrics files into a directory that only
+# gunicorn creates, and it would pollute the live metrics (ADR-0015).
+CMD ["env", "PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus-multiproc", \
+     "gunicorn", "-c", "gunicorn.conf.py", "config.wsgi:application"]
