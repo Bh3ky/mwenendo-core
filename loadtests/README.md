@@ -39,6 +39,23 @@ SKU_COUNT=1 uv run locust -f loadtests/locustfile.py --headless \
 - `SKU_COUNT=50` (with `--count 50` when seeding) spreads the load.
 - `-u` is the number of simulated users, `-r` how many start per second.
 
+## Comparing against gunicorn
+
+`run_all.sh` runs all three scenarios against a real gunicorn on the benchmark
+database, then checks correctness and prints a summary table. Give each run a
+`LABEL`, which becomes the prefix of its own products so runs do not disturb each
+other:
+
+```bash
+LABEL=conn60 DB_CONN_MAX_AGE=60 loadtests/run_all.sh   # persistent connections
+LABEL=conn0  DB_CONN_MAX_AGE=0  loadtests/run_all.sh   # a new connection per request
+```
+
+It refuses to run unless `POSTGRES_DB` contains `bench` (the default is
+`mwenendo_bench`). Output and CSV files go to `loadtests/results/`, which git ignores.
+To put earlier runs side by side:
+`uv run python loadtests/summarise.py loadtests/results/conn60-hot loadtests/results/conn0-hot`.
+
 ## After every run: check correctness, not only speed
 
 ```bash

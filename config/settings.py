@@ -92,6 +92,11 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_PASSWORD"),
         "HOST": env("POSTGRES_HOST"),
         "PORT": env("POSTGRES_PORT"),
+        # Keep a connection open between requests instead of opening a new one
+        # each time. Set DB_CONN_MAX_AGE=0 to turn it off (ADR-0016).
+        "CONN_MAX_AGE": env.int("DB_CONN_MAX_AGE", default=60),
+        # Before reusing a connection, check it still works.
+        "CONN_HEALTH_CHECKS": True,
     }
 }
 
