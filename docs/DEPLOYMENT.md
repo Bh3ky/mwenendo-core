@@ -128,6 +128,13 @@ docker compose --env-file .env.production -f docker-compose.prod.yml \
   run --rm app python manage.py createsuperuser
 ```
 
+Then add your first product, because a new database has none. Log in at
+`https://your-name.duckdns.org/admin/`, add a **Product** (a SKU such as `DEMO-1` and
+a name), then add an **Inventory** for it. The inventory starts empty and its counters
+are read-only in the admin on purpose, so give it stock from the demo page at
+`/demo/` ("Add 10 units"), or with `POST /api/products/DEMO-1/inventory/add`. That way
+every change goes through the ledger.
+
 To avoid typing the long command, add this line to `~/.bashrc`:
 `alias dcp='docker compose --env-file .env.production -f docker-compose.prod.yml'`
 
