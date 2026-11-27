@@ -44,7 +44,7 @@ For business state:
 ## Decision
 
 - **`prometheus-client` directly.** `core/metrics.py` defines the metrics, `core/middleware.py` counts and times requests, and `config/metrics.py` serves `/metrics`. The view lives in `config`, not `core`, because it reads the inventory and reservation models and `core` is shared by every app and must not depend on them.
-- **Multiprocess mode for the web server.** The `app` container sets `PROMETHEUS_MULTIPROC_DIR`. `gunicorn.conf.py` empties that directory in `on_starting` and calls `mark_process_dead` in `child_exit`. Without the variable (`runserver`, tests) the default in-memory registry is reported instead. The worker and beat containers do not set it.
+- **Multiprocess mode for the web server.** The image's `CMD` sets `PROMETHEUS_MULTIPROC_DIR` for the gunicorn process only, not for the whole container: any other command run in the image (`manage.py`, a shell) would otherwise find the variable set and the directory missing, and would fail, or would write into gunicorn's live metrics directory. `gunicorn.conf.py` empties that directory in `on_starting` and calls `mark_process_dead` in `child_exit`. Without the variable (`runserver`, tests) the default in-memory registry is reported instead. The worker and beat containers, and one-off commands, are unaffected.
 - **Metrics:**
   - `http_requests_total{method, route, status}` and `http_request_duration_seconds{method, route}` (a histogram),
   - `stock_allocation_refused_total`,

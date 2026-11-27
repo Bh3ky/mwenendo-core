@@ -48,9 +48,7 @@ services:
 
   app:
     <<: *app
-    environment:
-      <<: *app-env
-      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus-multiproc
+    # Multiprocess metrics are switched on by the image's CMD, for gunicorn only.
     expose:
       - "8000"
     healthcheck:
